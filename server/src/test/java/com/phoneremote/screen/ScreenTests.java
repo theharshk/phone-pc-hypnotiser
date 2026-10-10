@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.phoneremote.adapter.InputAdapter;
 import com.phoneremote.adapter.MouseButton;
-import com.phoneremote.adapter.ScreenAdapter;
 import com.phoneremote.adapter.fake.FakeScreenAdapter;
 import com.phoneremote.module.ScreenModule;
 import com.phoneremote.ws.Session;
@@ -13,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -34,28 +31,39 @@ class ScreenTests {
     }
 
     @Test
-    void testFrameHeaderEncodingAndBackpressure() throws Exception {
+    void testPipelineAndBackpressure() throws Exception {
         module.onOpen(session);
+        Thread.sleep(1000); // let pipeline produce frames
 
-        // Wait a little bit for the thread to generate frames
-        Thread.sleep(500);
-
+        // Due to backpressure limit of 2, sender thread should only send up to 2 frames without ACKs
         ArgumentCaptor<byte[]> captor = ArgumentCaptor.forClass(byte[].class);
-        verify(session, atLeast(1)).sendBinary(captor.capture());
+        verify(session, atMost(2)).sendBinary(captor.capture());
+        verify(session, atLeast(2)).sendBinary(any());
 
         byte[] frame = captor.getValue();
         assertNotNull(frame);
         assertTrue(frame.length > 8);
 
         ByteBuffer buf = ByteBuffer.wrap(frame);
-        assertEquals(1, buf.get()); // type
-        assertEquals(0, buf.get()); // monitor
+        assertEquals(1, buf.get());
+        assertEquals(0, buf.get());
         int w = buf.getShort() & 0xFFFF;
         int h = buf.getShort() & 0xFFFF;
-        assertEquals(1920, w); // scale 100
+        assertEquals(1920, w); // scale 100 default
         assertEquals(1080, h);
 
         module.onClose(session);
+
+        // Test thread cleanup
+        Thread.sleep(200);
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            if (t.getName().startsWith("ScreenCap-test-1") ||
+                t.getName().startsWith("ScreenEnc-test-1") ||
+                t.getName().startsWith("ScreenSnd-test-1") ||
+                t.getName().startsWith("CursorSnd-test-1")) {
+                assertFalse(t.isAlive(), "Thread " + t.getName() + " should be dead");
+            }
+        }
     }
 
     @Test
@@ -81,14 +89,11 @@ class ScreenTests {
         module.onOpen(session);
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode data = mapper.createObjectNode();
-        data.put("quality", 200); // above 90
-        data.put("scale", 10);    // below 25
-        data.put("fps", 30);      // above 15
+        data.put("quality", 200);
+        data.put("scale", 10);
+        data.put("fps", 50); // above 30 limit
         
         module.onMessage(session, "settings", data);
-        
-        // Wait and check logs or just verify it does not crash
-        // The values should clamp internally.
         module.onClose(session);
     }
 }

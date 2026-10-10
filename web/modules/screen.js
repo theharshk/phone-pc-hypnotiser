@@ -14,7 +14,7 @@ export default {
         fpsLbl.textContent = 'FPS: ';
         const fpsIn = document.createElement('input');
         fpsIn.type = 'number';
-        fpsIn.min = 1; fpsIn.max = 15; fpsIn.value = 5;
+        fpsIn.min = 1; fpsIn.max = 30; fpsIn.value = 10;
         fpsIn.style.width = '40px';
         fpsLbl.appendChild(fpsIn);
         

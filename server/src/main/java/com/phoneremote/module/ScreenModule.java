@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class ScreenModule implements RemoteModule {
@@ -70,15 +71,14 @@ public class ScreenModule implements RemoteModule {
         if (ctx == null) return;
 
         if ("ack".equals(type)) {
-            // int seq = data.path("seq").asInt();
             ctx.unackedFrames.decrementAndGet();
         } else if ("settings".equals(type)) {
             int q = data.path("quality").asInt(80);
             int s = data.path("scale").asInt(100);
-            int f = data.path("fps").asInt(5);
+            int f = data.path("fps").asInt(10);
             ctx.quality = Math.max(30, Math.min(90, q));
             ctx.scale = Math.max(25, Math.min(100, s));
-            ctx.fps = Math.max(1, Math.min(15, f));
+            ctx.fps = Math.max(1, Math.min(30, f));
         } else if ("tap".equals(type)) {
             double nx = data.path("x").asDouble();
             double ny = data.path("y").asDouble();
@@ -88,7 +88,6 @@ public class ScreenModule implements RemoteModule {
 
             java.util.List<ScreenAdapter.MonitorInfo> monitors = screenAdapter.monitors();
             if (monitors.isEmpty()) return;
-            // Assuming monitor 0 for now
             Rectangle bounds = monitors.get(0).bounds;
             int absX = bounds.x + (int) (nx * bounds.width);
             int absY = bounds.y + (int) (ny * bounds.height);
@@ -100,20 +99,33 @@ public class ScreenModule implements RemoteModule {
         }
     }
 
-    private class StreamContext {
+    class StreamContext {
         Session session;
         volatile boolean running = false;
         Thread captureThread;
+        Thread encodeThread;
         Thread senderThread;
         Thread cursorThread;
 
         int quality = 80;
         int scale = 100;
-        int fps = 5;
+        int fps = 10;
 
         int sequence = 0;
         AtomicInteger unackedFrames = new AtomicInteger(0);
-        ArrayBlockingQueue<byte[]> frameQueue = new ArrayBlockingQueue<>(2);
+        
+        class FrameData {
+            BufferedImage img;
+            int targetW, targetH, qual;
+            long capStart, capEnd;
+            long encWaitStart, encWaitMs;
+            long scaleStart, encodeStart, encodeEnd;
+            long sendWaitStart;
+            byte[] jpeg;
+        }
+
+        ArrayBlockingQueue<FrameData> encodeQueue = new ArrayBlockingQueue<>(2);
+        ArrayBlockingQueue<FrameData> sendQueue = new ArrayBlockingQueue<>(2);
 
         public StreamContext(Session session) {
             this.session = session;
@@ -123,15 +135,7 @@ public class ScreenModule implements RemoteModule {
             running = true;
 
             captureThread = new Thread(() -> {
-                ImageWriter writer = null;
                 try {
-                    Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
-                    if (writers.hasNext()) writer = writers.next();
-                    if (writer == null) return;
-
-                    ImageWriteParam param = writer.getDefaultWriteParam();
-                    param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-
                     while (running) {
                         long start = System.currentTimeMillis();
                         long targetTime = start + (1000 / fps);
@@ -140,45 +144,26 @@ public class ScreenModule implements RemoteModule {
                             java.util.List<ScreenAdapter.MonitorInfo> monitors = screenAdapter.monitors();
                             if (!monitors.isEmpty()) {
                                 long capStart = System.currentTimeMillis();
-                                BufferedImage img = screenAdapter.capture(0); // monitor 0
+                                BufferedImage img = screenAdapter.capture(0);
                                 long capEnd = System.currentTimeMillis();
 
                                 if (img != null) {
-                                    int targetW = Math.max(1, (img.getWidth() * scale) / 100);
-                                    int targetH = Math.max(1, (img.getHeight() * scale) / 100);
-                                    
-                                    long scaleStart = System.currentTimeMillis();
-                                    BufferedImage scaled = new BufferedImage(targetW, targetH, BufferedImage.TYPE_INT_RGB);
-                                    Graphics2D g = scaled.createGraphics();
-                                    g.drawImage(img, 0, 0, targetW, targetH, null);
-                                    g.dispose();
-                                    long scaleEnd = System.currentTimeMillis();
+                                    FrameData fd = new FrameData();
+                                    fd.img = img;
+                                    fd.capStart = capStart;
+                                    fd.capEnd = capEnd;
+                                    fd.targetW = Math.max(1, (img.getWidth() * scale) / 100);
+                                    fd.targetH = Math.max(1, (img.getHeight() * scale) / 100);
+                                    fd.qual = quality;
+                                    fd.encWaitStart = System.currentTimeMillis();
 
-                                    param.setCompressionQuality(quality / 100f);
-                                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                                    MemoryCacheImageOutputStream mos = new MemoryCacheImageOutputStream(baos);
-                                    writer.setOutput(mos);
-                                    writer.write(null, new IIOImage(scaled, null, null), param);
-                                    mos.close();
-                                    byte[] jpeg = baos.toByteArray();
-
-                                    long encEnd = System.currentTimeMillis();
-                                    
-                                    globalStats.addStat(capEnd - capStart, scaleEnd - scaleStart, encEnd - scaleEnd, jpeg.length / 1024, false);
-                                    logger.debug("Capture: {}ms, Scale: {}ms, Encode: {}ms, Size: {}KB", (capEnd - capStart), (scaleEnd - scaleStart), (encEnd - scaleEnd), jpeg.length / 1024);
-
-                                    sequence = (sequence + 1) % 65536;
-
-                                    ByteBuffer buf = ByteBuffer.allocate(8 + jpeg.length);
-                                    buf.put((byte) 1); // type
-                                    buf.put((byte) 0); // monitor index
-                                    buf.putShort((short) targetW);
-                                    buf.putShort((short) targetH);
-                                    buf.putShort((short) sequence);
-                                    buf.put(jpeg);
-
-                                    unackedFrames.incrementAndGet();
-                                    frameQueue.offer(buf.array());
+                                    while (!encodeQueue.offer(fd)) {
+                                        FrameData dropped = encodeQueue.poll();
+                                        if (dropped != null) {
+                                            logger.debug("DROPPED frame at encode stage");
+                                            globalStats.addStat(0, 0, 0, 0, true);
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -191,27 +176,116 @@ public class ScreenModule implements RemoteModule {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("Capture thread error", e);
+                }
+            });
+            captureThread.setDaemon(true);
+            captureThread.setName("ScreenCap-" + session.getId());
+            captureThread.start();
+
+            encodeThread = new Thread(() -> {
+                ImageWriter writer = null;
+                try {
+                    Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+                    if (writers.hasNext()) writer = writers.next();
+                    if (writer == null) return;
+                    ImageWriteParam param = writer.getDefaultWriteParam();
+                    param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+
+                    while (running) {
+                        FrameData fd = encodeQueue.poll(50, TimeUnit.MILLISECONDS);
+                        if (fd == null) continue;
+
+                        long now = System.currentTimeMillis();
+                        fd.encWaitMs = now - fd.encWaitStart;
+
+                        fd.scaleStart = now;
+                        BufferedImage toEncode = fd.img;
+
+                        if (fd.targetW != fd.img.getWidth() || fd.targetH != fd.img.getHeight() || 
+                           (fd.img.getType() != BufferedImage.TYPE_INT_RGB && fd.img.getType() != BufferedImage.TYPE_3BYTE_BGR)) {
+                            
+                            BufferedImage scaled = new BufferedImage(fd.targetW, fd.targetH, BufferedImage.TYPE_INT_RGB);
+                            Graphics2D g = scaled.createGraphics();
+                            g.drawImage(fd.img, 0, 0, fd.targetW, fd.targetH, null);
+                            g.dispose();
+                            toEncode = scaled;
+                        }
+
+                        fd.encodeStart = System.currentTimeMillis();
+                        param.setCompressionQuality(fd.qual / 100f);
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        MemoryCacheImageOutputStream mos = new MemoryCacheImageOutputStream(baos);
+                        writer.setOutput(mos);
+                        writer.write(null, new IIOImage(toEncode, null, null), param);
+                        mos.close();
+                        
+                        fd.jpeg = baos.toByteArray();
+                        fd.encodeEnd = System.currentTimeMillis();
+                        fd.sendWaitStart = fd.encodeEnd;
+
+                        while (!sendQueue.offer(fd)) {
+                            FrameData dropped = sendQueue.poll();
+                            if (dropped != null) {
+                                logger.debug("DROPPED frame at send stage");
+                                globalStats.addStat(0, 0, 0, 0, true);
+                            }
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    logger.error("Encode thread error", e);
                 } finally {
                     if (writer != null) writer.dispose();
                 }
             });
-            captureThread.setDaemon(true);
-            captureThread.setName("ScreenCapture-" + session.getId());
-            captureThread.start();
+            encodeThread.setDaemon(true);
+            encodeThread.setName("ScreenEnc-" + session.getId());
+            encodeThread.start();
 
             senderThread = new Thread(() -> {
                 try {
                     while (running) {
-                        byte[] frame = frameQueue.take();
-                        session.sendBinary(frame);
+                        if (unackedFrames.get() >= 2) {
+                            Thread.sleep(5);
+                            continue;
+                        }
+                        
+                        FrameData fd = sendQueue.poll(50, TimeUnit.MILLISECONDS);
+                        if (fd == null) continue;
+
+                        long sendWaitMs = System.currentTimeMillis() - fd.sendWaitStart;
+
+                        sequence = (sequence + 1) % 65536;
+
+                        ByteBuffer buf = ByteBuffer.allocate(8 + fd.jpeg.length);
+                        buf.put((byte) 1);
+                        buf.put((byte) 0);
+                        buf.putShort((short) fd.targetW);
+                        buf.putShort((short) fd.targetH);
+                        buf.putShort((short) sequence);
+                        buf.put(fd.jpeg);
+
+                        unackedFrames.incrementAndGet();
+                        session.sendBinary(buf.array());
+
+                        long capMs = fd.capEnd - fd.capStart;
+                        long scaleMs = fd.encodeStart - fd.scaleStart;
+                        long encMs = fd.encodeEnd - fd.encodeStart;
+
+                        globalStats.addStat(capMs, scaleMs, encMs, fd.jpeg.length / 1024, false);
+                        logger.debug("Capture: {}ms, EncWait: {}ms, Scale: {}ms, Encode: {}ms, SendWait: {}ms, Size: {}KB", 
+                                     capMs, fd.encWaitMs, scaleMs, encMs, sendWaitMs, fd.jpeg.length / 1024);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    logger.error("Send thread error", e);
                 }
             });
             senderThread.setDaemon(true);
-            senderThread.setName("ScreenSender-" + session.getId());
+            senderThread.setName("ScreenSnd-" + session.getId());
             senderThread.start();
 
             cursorThread = new Thread(() -> {
@@ -235,7 +309,7 @@ public class ScreenModule implements RemoteModule {
                                 session.send(mapper.writeValueAsString(msg));
                             }
                         }
-                        Thread.sleep(200); // 5 Hz
+                        Thread.sleep(200);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -243,13 +317,14 @@ public class ScreenModule implements RemoteModule {
                 }
             });
             cursorThread.setDaemon(true);
-            cursorThread.setName("CursorSender-" + session.getId());
+            cursorThread.setName("CursorSnd-" + session.getId());
             cursorThread.start();
         }
 
         public void stop() {
             running = false;
             if (captureThread != null) captureThread.interrupt();
+            if (encodeThread != null) encodeThread.interrupt();
             if (senderThread != null) senderThread.interrupt();
             if (cursorThread != null) cursorThread.interrupt();
         }
