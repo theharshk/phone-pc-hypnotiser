@@ -11,6 +11,7 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import java.io.File;
 import java.nio.file.Paths;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
+import org.springframework.web.socket.WebSocketHandler;
 
 @Configuration
 @EnableWebSocket
@@ -47,6 +48,25 @@ public class AppConfig implements WebMvcConfigurer, WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(remoteSocketHandler, "/ws").setAllowedOrigins("*");
+        registry.addHandler(remoteSocketHandler, "/ws")
+                .addInterceptors(new org.springframework.web.socket.server.HandshakeInterceptor() {
+                    @Override
+                    public boolean beforeHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, WebSocketHandler wsHandler, java.util.Map<String, Object> attributes) throws Exception {
+                        String origin = request.getHeaders().getOrigin();
+                        if (origin != null) {
+                            java.net.URI originUri = new java.net.URI(origin);
+                            String hostHeader = request.getHeaders().getFirst("Host");
+                            if (hostHeader != null) {
+                                String originAuthority = originUri.getAuthority();
+                                if (!hostHeader.equals(originAuthority)) {
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    }
+                    @Override
+                    public void afterHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, WebSocketHandler wsHandler, Exception exception) {}
+                });
     }
 }

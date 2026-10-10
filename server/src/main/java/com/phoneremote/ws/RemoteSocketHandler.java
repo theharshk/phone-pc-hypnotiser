@@ -4,15 +4,23 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.phoneremote.config.ConfigStore;
 import com.phoneremote.module.ModuleRegistry;
 import com.phoneremote.module.RemoteModule;
+import com.phoneremote.terminal.TerminalPromptService;
+import com.phoneremote.admin.PendingApprovalStore;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -20,17 +28,36 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final ModuleRegistry moduleRegistry;
+    private final ConfigStore configStore;
+    private final LockoutTracker lockoutTracker;
+    private final TerminalPromptService promptService;
+    private final PendingApprovalStore pendingApprovalStore;
+
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private final Timer authTimer = new Timer(true);
     private static final int MAX_PAYLOAD_LENGTH = 8192;
 
-    public RemoteSocketHandler(ModuleRegistry moduleRegistry) {
+    public RemoteSocketHandler(ModuleRegistry moduleRegistry, ConfigStore configStore, LockoutTracker lockoutTracker, TerminalPromptService promptService, PendingApprovalStore pendingApprovalStore) {
         this.moduleRegistry = moduleRegistry;
+        this.configStore = configStore;
+        this.lockoutTracker = lockoutTracker;
+        this.promptService = promptService;
+        this.pendingApprovalStore = pendingApprovalStore;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession wsSession) throws Exception {
-        sessions.put(wsSession.getId(), new Session(wsSession));
-        System.out.println("Connection established: " + wsSession.getId());
+        Session session = new Session(wsSession);
+        sessions.put(wsSession.getId(), session);
+
+        authTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if (!session.isAuthenticated()) {
+                    session.close();
+                }
+            }
+        }, 10000); // 10 seconds timeout
     }
 
     @Override
@@ -50,6 +77,12 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             String t = root.path("t").asText("");
             JsonNode d = root.path("d");
 
+            if (!session.isAuthenticated()) {
+                if (!"core".equals(m) || (!"hello".equals(t) && !"pin".equals(t) && !"ping".equals(t))) {
+                    return; // Reject pre-auth
+                }
+            }
+
             if ("core".equals(m)) {
                 handleCoreMessage(session, root, t, d);
             } else {
@@ -65,7 +98,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Invalid message: " + e.getMessage());
+            // Ignore parse errors
         }
     }
 
@@ -73,55 +106,171 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
         if ("hello".equals(t)) {
             String deviceName = d.path("deviceName").asText("Unknown Device");
             session.setAttribute("deviceName", deviceName);
+            String token = d.path("token").asText("");
+            String deviceId = d.path("deviceId").asText("");
+            String ip = session.getRemoteAddressString();
 
-            ObjectNode response = mapper.createObjectNode();
-            response.put("m", "core");
-            response.put("t", "ready");
+            if (!token.isEmpty() && !deviceId.isEmpty()) {
+                if (configStore.verifyDeviceToken(deviceId, token, ip)) {
+                    session.setAuthenticated(true);
+                    session.setDeviceId(deviceId);
+                    sendReady(session);
+                } else {
+                    sendError(session, "revoked");
+                }
+            } else {
+                // Not paired yet
+                if (configStore.isPinSet()) {
+                    ObjectNode response = mapper.createObjectNode();
+                    response.put("m", "core");
+                    response.put("t", "need_pin");
+                    session.send(mapper.writeValueAsString(response));
+                } else {
+                    ObjectNode response = mapper.createObjectNode();
+                    response.put("m", "core");
+                    response.put("t", "pending_approval");
+                    session.send(mapper.writeValueAsString(response));
 
-            ObjectNode data = mapper.createObjectNode();
-            ArrayNode modulesArr = mapper.createArrayNode();
-            for (RemoteModule mod : moduleRegistry.getAll()) {
-                ObjectNode mObj = mapper.createObjectNode();
-                mObj.put("id", mod.id());
-                mObj.put("name", mod.displayName());
-                modulesArr.add(mObj);
+                    String finalDeviceId = deviceId.isEmpty() ? UUID.randomUUID().toString() : deviceId;
+                    String finalIp = ip;
+
+                    PendingApprovalStore.PendingDevice pDev = new PendingApprovalStore.PendingDevice();
+                    pDev.deviceId = finalDeviceId;
+                    pDev.name = deviceName;
+                    pDev.ip = finalIp;
+                    pDev.callback = (approved) -> {
+                        if (approved) {
+                            pairDevice(session, finalDeviceId, deviceName, finalIp);
+                        } else {
+                            session.close();
+                        }
+                    };
+                    pendingApprovalStore.add(pDev);
+
+                    promptService.prompt("Allow device '" + deviceName + "'? [y/n]:").thenAccept(ans -> {
+                        boolean approved = "y".equalsIgnoreCase(ans) || "yes".equalsIgnoreCase(ans);
+                        pendingApprovalStore.resolve(finalDeviceId, approved);
+                    });
+                }
             }
-            data.set("modules", modulesArr);
-            response.set("d", data);
+        } else if ("pin".equals(t)) {
+            String pin = d.path("pin").asText("");
+            String deviceId = d.path("deviceId").asText("");
+            String ip = session.getRemoteAddressString();
+            String deviceName = (String) session.getAttribute("deviceName");
 
-            session.send(mapper.writeValueAsString(response));
+            String keyIp = "IP:" + ip;
+            String keyDevice = "DEV:" + deviceId;
+            String keyGlobal = "GLOBAL";
+
+            if (lockoutTracker.isLockedOut(keyIp) || lockoutTracker.isLockedOut(keyDevice) || lockoutTracker.isLockedOut(keyGlobal)) {
+                sendError(session, "locked_out");
+                return;
+            }
+
+            if (configStore.verifyPin(pin)) {
+                lockoutTracker.clearStrikes(keyIp);
+                lockoutTracker.clearStrikes(keyDevice);
+                lockoutTracker.clearStrikes(keyGlobal);
+                pairDevice(session, deviceId, deviceName, ip);
+            } else {
+                lockoutTracker.recordStrike(keyIp);
+                lockoutTracker.recordStrike(keyDevice);
+                lockoutTracker.recordStrike(keyGlobal);
+                sendError(session, "bad_pin");
+            }
+
         } else if ("ping".equals(t)) {
             ObjectNode response = mapper.createObjectNode();
             response.put("m", "core");
             response.put("t", "pong");
-            if (root.has("i")) {
-                response.set("i", root.get("i"));
-            }
+            if (root.has("i")) response.set("i", root.get("i"));
             session.send(mapper.writeValueAsString(response));
-        } else if ("open".equals(t)) {
+        } else if ("open".equals(t) && session.isAuthenticated()) {
             String moduleId = d.path("module").asText("");
             RemoteModule module = moduleRegistry.get(moduleId);
-            if (module != null) {
-                session.execute(() -> module.onOpen(session));
-            }
-        } else if ("close".equals(t)) {
+            if (module != null) session.execute(() -> module.onOpen(session));
+        } else if ("close".equals(t) && session.isAuthenticated()) {
             String moduleId = d.path("module").asText("");
             RemoteModule module = moduleRegistry.get(moduleId);
-            if (module != null) {
-                session.execute(() -> module.onClose(session));
-            }
+            if (module != null) session.execute(() -> module.onClose(session));
         }
+    }
+
+    private void pairDevice(Session session, String deviceId, String name, String ip) {
+        if (deviceId == null || deviceId.isEmpty()) {
+            deviceId = UUID.randomUUID().toString();
+        }
+        SecureRandom sr = new SecureRandom();
+        byte[] tBytes = new byte[32];
+        sr.nextBytes(tBytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tBytes);
+
+        ConfigStore.DeviceInfo info = new ConfigStore.DeviceInfo();
+        info.deviceId = deviceId;
+        info.name = name;
+        info.tokenHash = configStore.hashToken(token);
+        info.created = System.currentTimeMillis();
+        info.lastSeen = info.created;
+        info.lastIp = ip;
+        configStore.addDevice(info);
+
+        session.setAuthenticated(true);
+        session.setDeviceId(deviceId);
+
+        try {
+            ObjectNode response = mapper.createObjectNode();
+            response.put("m", "core");
+            response.put("t", "paired");
+            ObjectNode data = mapper.createObjectNode();
+            data.put("token", token);
+            data.put("deviceId", deviceId);
+            response.set("d", data);
+            session.send(mapper.writeValueAsString(response));
+        } catch (Exception e) {}
+    }
+
+    private void sendError(Session session, String errType) {
+        try {
+            ObjectNode response = mapper.createObjectNode();
+            response.put("m", "core");
+            response.put("t", "error");
+            ObjectNode data = mapper.createObjectNode();
+            data.put("type", errType);
+            response.set("d", data);
+            session.send(mapper.writeValueAsString(response));
+        } catch (Exception e) {}
+    }
+
+    private void sendReady(Session session) throws Exception {
+        ObjectNode response = mapper.createObjectNode();
+        response.put("m", "core");
+        response.put("t", "ready");
+
+        ObjectNode data = mapper.createObjectNode();
+        ArrayNode modulesArr = mapper.createArrayNode();
+        for (RemoteModule mod : moduleRegistry.getAll()) {
+            ObjectNode mObj = mapper.createObjectNode();
+            mObj.put("id", mod.id());
+            mObj.put("name", mod.displayName());
+            modulesArr.add(mObj);
+        }
+        data.set("modules", modulesArr);
+        response.set("d", data);
+
+        session.send(mapper.writeValueAsString(response));
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession wsSession, CloseStatus status) throws Exception {
         Session session = sessions.remove(wsSession.getId());
         if (session != null) {
-            for (RemoteModule module : moduleRegistry.getAll()) {
-                module.onClose(session);
+            if (session.isAuthenticated()) {
+                for (RemoteModule module : moduleRegistry.getAll()) {
+                    module.onClose(session);
+                }
             }
             session.close();
         }
-        System.out.println("Connection closed: " + wsSession.getId());
     }
 }

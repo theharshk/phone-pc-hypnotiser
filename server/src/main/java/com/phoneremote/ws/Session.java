@@ -14,13 +14,28 @@ public class Session {
     private final ExecutorService executor;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
+    private boolean authenticated = false;
+    private String deviceId;
+
     public Session(WebSocketSession wsSession) {
         this.wsSession = wsSession;
         this.executor = Executors.newSingleThreadExecutor();
     }
 
+    public boolean isAuthenticated() { return authenticated; }
+    public void setAuthenticated(boolean authenticated) { this.authenticated = authenticated; }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
     public String getId() {
         return wsSession.getId();
+    }
+
+    public String getRemoteAddressString() {
+        if (wsSession.getRemoteAddress() != null) {
+            return wsSession.getRemoteAddress().getAddress().getHostAddress();
+        }
+        return "unknown";
     }
 
     public void setAttribute(String key, Object value) {
@@ -55,5 +70,10 @@ public class Session {
 
     public void close() {
         executor.shutdown();
+        try {
+            if (wsSession.isOpen()) wsSession.close();
+        } catch (IOException e) {
+            // Ignore
+        }
     }
 }
