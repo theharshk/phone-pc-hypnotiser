@@ -6,12 +6,12 @@ public class ScreenStats {
     private static final long WINDOW_MS = 5000;
 
     public static class FrameStat {
-        long timestamp;
-        long captureMs;
-        long scaleMs;
-        long encodeMs;
-        long frameSizeKB;
-        boolean skipped;
+        public long timestamp;
+        public long captureMs;
+        public long scaleMs;
+        public long encodeMs;
+        public long frameSizeKB;
+        public boolean skipped;
     }
 
     private final ConcurrentLinkedDeque<FrameStat> window = new ConcurrentLinkedDeque<>();
@@ -33,6 +33,16 @@ public class ScreenStats {
         while (!window.isEmpty() && window.peekFirst().timestamp < threshold) {
             window.pollFirst();
         }
+    }
+
+    public java.util.List<FrameStat> getRecentFrames(int max) {
+        cleanup();
+        java.util.List<FrameStat> list = new java.util.ArrayList<>();
+        java.util.Iterator<FrameStat> it = window.descendingIterator();
+        while (it.hasNext() && list.size() < max) {
+            list.add(it.next());
+        }
+        return list;
     }
 
     public Averages getAverages() {

@@ -2,21 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
     <title>Phone Remote</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="status-bar">
-        <div id="status-indicator" class="disconnected"></div>
-        <span id="status-text">Disconnected</span>
-    </div>
+    <header>
+        <h1>Remote</h1>
+        <div class="status-pill">
+            <div id="status-indicator" class="status-dot disconnected"></div>
+            <span id="status-text">Disconnected</span>
+        </div>
+    </header>
     
     <div id="main-content">
-        <h1>Phone Remote</h1>
         <div id="module-container"></div>
-        <div id="active-module" style="margin-top: 20px;"></div>
     </div>
+    
+    <div id="active-module"></div>
 
     <script type="module" src="host.js"></script>
 </body>

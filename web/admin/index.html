@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSRF token will be injected here by the server -->
+    <title>Phone Remote Admin</title>
+    <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="24" height="24"><path d="M12 2v20M17 5l-10 14M22 12H2M19 17L5 7"></path></svg>
+            Admin
+        </div>
+        <button aria-label="Overview" class="nav-item active" data-page="overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            Overview
+        </button>
+        <button aria-label="Devices" class="nav-item" data-page="devices">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            Devices
+        </button>
+        <button aria-label="Logs" class="nav-item" data-page="logs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+            Logs & Stats
+        </button>
+        <button aria-label="Settings" class="nav-item" data-page="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Settings
+        </button>
+        <div style="margin-top: auto; color: #5B6577; font-size: 0.85rem; padding: 0 12px; font-weight: 500;" id="serverAddressText">
+            Loading...
+        </div>
+    </nav>
+    <main class="content">
+        <header class="topbar">
+            <div class="breadcrumbs">
+                Admin / <span class="current" id="breadcrumbCurrent">Overview</span>
+            </div>
+            <div class="top-actions">
+                <button class="btn btn-outline" onclick="location.reload()">Refresh</button>
+                <button class="btn btn-black btn-icon-only" aria-label="Profile">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </button>
+            </div>
+        </header>
+        
+        <div id="page-overview" class="page active bento-grid">
+            <div id="overview-connect" class="col-span-4 bento-grid" style="display:contents"></div>
+            
+            <div class="card card-alt col-span-4" style="padding: 40px; display: flex; flex-direction: column;">
+                <h2 class="heading" style="margin-bottom: 32px; font-size:1.8rem;">Connection Security</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;">
+                    <!-- Left: 60% -->
+                    <div style="flex: 1.5; min-width: 300px; display: flex; flex-direction: column; justify-content: flex-start; gap: 24px; min-height: 220px;">
+                        <div>
+                            <label style="display:flex; align-items:center; gap:16px; font-weight:700; cursor:pointer; font-size:1.3rem;">
+                                <input type="checkbox" id="requirePin" onchange="updateSecurityModeLocal()" style="width:24px; height:24px; accent-color:var(--ink);">
+                                Require PIN Code
+                            </label>
+                            <p style="color:var(--muted); font-size:1.05rem; margin-top:8px; margin-left:40px;">Users must enter a 6-digit security PIN on their phone to connect.</p>
+                        </div>
+
+                        <div id="vulnWarning" style="margin-top:8px; padding:16px 20px; background:rgba(229,48,58,0.1); border-left:6px solid var(--danger); color:var(--danger); font-weight:700; font-size:1.1rem; border-radius:6px; display:none;">
+                            WARNING: Open Mode Active. Anyone on the network can connect instantly.
+                        </div>
+                    </div>
+                    
+                    <!-- Right: 40% -->
+                    <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 40px; min-height: 220px;">
+                        <div id="pinInputContainer" style="width:100%; display:none; flex-direction:column; margin-bottom: 20px;">
+                            <label style="font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; font-size:0.95rem; margin-bottom:16px;">Set 6-Digit PIN</label>
+                            <input type="text" id="pinInputOverview" placeholder="••••••" maxlength="6" pattern="\d{6}" style="font-size: 3rem; letter-spacing: 0.4em; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-align: center; width: 100%; max-width: 340px; padding: 20px; background: #ffffff; border: 2px solid rgba(0,0,0,0.1); border-radius: 16px; color: var(--ink); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                        </div>
+                        <button class="btn btn-black" style="padding: 16px 40px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onclick="saveSecuritySettings()">Update</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="overview-devices" class="col-span-4 bento-grid" style="display:contents"></div>
+        </div>
+
+        <div id="page-devices" class="page">
+            <div class="card col-span-4">
+                <h2 class="heading" style="margin-bottom: 24px;">Paired Devices</h2>
+                <div id="pendingApprovalsContainer" style="display:none;"></div>
+                <div class="table-container">
+                    <table class="data-table" id="devicesTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th>Last Seen</th>
+                                <th>Last IP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-danger" onclick="revokeAll()">Revoke All Devices</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-logs" class="page">
+            <div style="background:var(--card); border:1px solid rgba(0,0,0,0.1); border-radius:12px; padding:24px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h2 class="heading" style="font-size:1.5rem; margin-bottom:4px;">Server Health</h2>
+                    <p style="color:var(--muted); font-size:1rem;">Uptime and streaming performance statistics</p>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:800; font-size:0.9rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Server Uptime</div>
+                    <div id="serverUptimeDisplay" style="font-family:'JetBrains Mono', monospace; font-size:1.5rem; font-weight:700; color:var(--ink);">0h 0m 0s</div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" data-target="tab-app-log">App Log</button>
+                <button class="tab" data-target="tab-frame-log">Frame Log</button>
+            </div>
+            <div id="tab-app-log" class="tab-content active">
+                <div class="card col-span-4 card-black">
+                    <div class="controls">
+                        <select id="logLevelFilter" aria-label="Level Filter">
+                            <option value="">ALL LEVELS</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                        <input type="text" id="logSearch" placeholder="Search text..." aria-label="Search logs">
+                        <label style="color: white; display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="logAutoRefresh" checked> Auto-refresh</label>
+                        <button class="btn btn-outline-white" onclick="fetchLogs(true)">Refresh</button>
+                        <a class="btn btn-primary" href="/admin/logs/download" target="_blank">Download</a>
+                    </div>
+                    <pre class="log-terminal mono" id="appLogOutput">Loading logs...</pre>
+                </div>
+            </div>
+            <div id="tab-frame-log" class="tab-content">
+                <div class="card col-span-4">
+                    <div id="frameLogHeader" class="frame-stats-strip">
+                        <!-- Rendered by JS -->
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table mono" id="frameLogTable">
+                            <thead>
+                                <tr>
+                                    <th>Seq/Time</th>
+                                    <th>Capture</th>
+                                    <th>Scale</th>
+                                    <th>Encode</th>
+                                    <th>SendWait</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-settings" class="page bento-grid">
+            <div class="card card-alt col-span-4" style="padding: 40px; display: flex; flex-direction: column;">
+                <h2 class="heading" style="margin-bottom: 32px; font-size:1.8rem;">Connection Security</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;">
+                    <!-- Left: 60% -->
+                    <div style="flex: 1.5; min-width: 300px; display: flex; flex-direction: column; justify-content: flex-start; gap: 24px; min-height: 220px;">
+                        <div>
+                            <label style="display:flex; align-items:center; gap:16px; font-weight:700; cursor:pointer; font-size:1.3rem;">
+                                <input type="checkbox" id="requirePinSettings" onchange="updateSecurityModeLocal(false, true)" style="width:24px; height:24px; accent-color:var(--ink);">
+                                Require PIN Code
+                            </label>
+                            <p style="color:var(--muted); font-size:1.05rem; margin-top:8px; margin-left:40px;">Users must enter a 6-digit security PIN on their phone to connect.</p>
+                        </div>
+
+                        <div id="vulnWarningSettings" style="margin-top:8px; padding:16px 20px; background:rgba(229,48,58,0.1); border-left:6px solid var(--danger); color:var(--danger); font-weight:700; font-size:1.1rem; border-radius:6px; display:none;">
+                            WARNING: Open Mode Active. Anyone on the network can connect instantly.
+                        </div>
+                    </div>
+                    
+                    <!-- Right: 40% -->
+                    <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 40px; min-height: 220px;">
+                        <div id="pinInputContainerSettings" style="width:100%; display:none; flex-direction:column; margin-bottom: 20px;">
+                            <label style="font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; font-size:0.95rem; margin-bottom:16px;">Set 6-Digit PIN</label>
+                            <input type="text" id="pinInputSettings" placeholder="••••••" maxlength="6" pattern="\d{6}" style="font-size: 3rem; letter-spacing: 0.4em; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-align: center; width: 100%; max-width: 340px; padding: 20px; background: #ffffff; border: 2px solid rgba(0,0,0,0.1); border-radius: 16px; color: var(--ink); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                        </div>
+                        <button class="btn btn-black" style="padding: 16px 40px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onclick="saveSecuritySettings(true)">Update</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card col-span-4" style="padding: 40px; border: 1px solid rgba(229,48,58,0.2); background: rgba(229,48,58,0.02); display:flex; flex-direction:row; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="margin-bottom:8px; color:var(--danger); font-size:1.4rem;">Reset Lockouts</h3>
+                    <p style="color:var(--muted); font-size:1.05rem;">Clear all brute-force IP bans and device lockouts.</p>
+                </div>
+                <button class="btn btn-outline" style="padding: 12px 32px; border-color:var(--danger); color:var(--danger); font-weight:700;" onclick="clearLockouts()">Clear All Lockouts</button>
+            </div>
+        </div>
+    </main>
+    <script src="/admin/assets/qrcode.min.js"></script>
+    <script src="/admin/admin.js"></script>
+</body>
+</html>

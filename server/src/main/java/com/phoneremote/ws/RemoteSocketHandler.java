@@ -8,7 +8,6 @@ import com.phoneremote.config.ConfigStore;
 import com.phoneremote.module.ModuleRegistry;
 import com.phoneremote.module.RemoteModule;
 import com.phoneremote.terminal.TerminalPromptService;
-import com.phoneremote.admin.PendingApprovalStore;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -31,18 +30,20 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
     private final ConfigStore configStore;
     private final LockoutTracker lockoutTracker;
     private final TerminalPromptService promptService;
-    private final PendingApprovalStore pendingApprovalStore;
 
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final Timer authTimer = new Timer(true);
     private static final int MAX_PAYLOAD_LENGTH = 8192;
 
-    public RemoteSocketHandler(ModuleRegistry moduleRegistry, ConfigStore configStore, LockoutTracker lockoutTracker, TerminalPromptService promptService, PendingApprovalStore pendingApprovalStore) {
+    public int getActiveSessionCount() {
+        return (int) sessions.values().stream().filter(Session::isAuthenticated).count();
+    }
+
+    public RemoteSocketHandler(ModuleRegistry moduleRegistry, ConfigStore configStore, LockoutTracker lockoutTracker, TerminalPromptService promptService) {
         this.moduleRegistry = moduleRegistry;
         this.configStore = configStore;
         this.lockoutTracker = lockoutTracker;
         this.promptService = promptService;
-        this.pendingApprovalStore = pendingApprovalStore;
     }
 
     @Override
@@ -126,31 +127,9 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                     response.put("t", "need_pin");
                     session.send(mapper.writeValueAsString(response));
                 } else {
-                    ObjectNode response = mapper.createObjectNode();
-                    response.put("m", "core");
-                    response.put("t", "pending_approval");
-                    session.send(mapper.writeValueAsString(response));
-
+                    // Open mode auto-pair
                     String finalDeviceId = deviceId.isEmpty() ? UUID.randomUUID().toString() : deviceId;
-                    String finalIp = ip;
-
-                    PendingApprovalStore.PendingDevice pDev = new PendingApprovalStore.PendingDevice();
-                    pDev.deviceId = finalDeviceId;
-                    pDev.name = deviceName;
-                    pDev.ip = finalIp;
-                    pDev.callback = (approved) -> {
-                        if (approved) {
-                            pairDevice(session, finalDeviceId, deviceName, finalIp);
-                        } else {
-                            session.close();
-                        }
-                    };
-                    pendingApprovalStore.add(pDev);
-
-                    promptService.prompt("Allow device '" + deviceName + "'? [y/n]:").thenAccept(ans -> {
-                        boolean approved = "y".equalsIgnoreCase(ans) || "yes".equalsIgnoreCase(ans);
-                        pendingApprovalStore.resolve(finalDeviceId, approved);
-                    });
+                    pairDevice(session, finalDeviceId, deviceName, ip);
                 }
             }
         } else if ("pin".equals(t)) {

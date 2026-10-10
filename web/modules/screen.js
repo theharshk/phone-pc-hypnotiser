@@ -121,10 +121,96 @@ export default {
         };
         fullscreenContainer.appendChild(fsBtn);
 
+        // Unified Footer Toolbar (Keyboard + Trackpad Modes)
+        const footerBar = document.createElement('div');
+        footerBar.style.cssText = 'position:fixed; bottom:0; left:0; width:100%; padding:12px; background:rgba(0,0,0,0.65); backdrop-filter:blur(20px); border-top:1px solid rgba(255,255,255,0.1); z-index:1000; display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;';
+
+        const typeBtn = document.createElement('button');
+        typeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect><path d="M7 15h.01M11 15h.01M15 15h.01M7 17h10"></path><path d="M3 7h18"></path></svg> <span style="margin-left:4px">Keyboard</span>';
+        typeBtn.style.cssText = 'background:rgba(255,255,255,0.15); color:white; border-radius:12px; padding:10px 20px; font-weight:600; font-size:0.9rem; border:none; display:flex; align-items:center; box-shadow:0 2px 10px rgba(0,0,0,0.2); flex:1; justify-content:center;';
+        
+        // Hidden input to trigger native keyboard
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'text';
+        hiddenInput.style.cssText = 'position:absolute; opacity:0; pointer-events:none;';
+        typeBtn.appendChild(hiddenInput);
+        
+        hiddenInput.addEventListener('input', (e) => {
+            if (e.inputType === 'insertText') {
+                api.send('type', {text: e.data});
+            }
+            hiddenInput.value = '';
+        });
+        hiddenInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' || e.key === 'Enter') {
+                api.send('key', {key: e.key});
+            }
+        });
+        
+        typeBtn.onclick = () => { hiddenInput.focus(); };
+
+        const lBtn = document.createElement('button');
+        lBtn.innerHTML = 'Left Click';
+        lBtn.style.cssText = 'background:rgba(255,255,255,0.1); color:white; border-radius:12px; padding:10px; font-weight:600; font-size:0.9rem; border:none; flex:1;';
+        lBtn.onclick = () => api.send('click', {button:'left'});
+        
+        const rBtn = document.createElement('button');
+        rBtn.innerHTML = 'Right Click';
+        rBtn.style.cssText = 'background:rgba(255,255,255,0.1); color:white; border-radius:12px; padding:10px; font-weight:600; font-size:0.9rem; border:none; flex:1;';
+        rBtn.onclick = () => api.send('click', {button:'right'});
+        
+        footerBar.appendChild(typeBtn);
+        footerBar.appendChild(lBtn);
+        footerBar.appendChild(rBtn);
+        
+        container.appendChild(footerBar);
+        
+        // Trackpad logic layered over the screen (so they can swipe anywhere)
+        let isRelativeMode = false;
+        let lastTouch = null;
+        const toggleModeBtn = document.createElement('button');
+        toggleModeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><line x1="4" y1="12" x2="20" y2="12"></line><line x1="12" y1="12" x2="12" y2="20"></line></svg>';
+        toggleModeBtn.style.cssText = 'position:absolute; bottom:85px; right:16px; background:var(--accent); color:white; border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; border:none; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:900;';
+        container.appendChild(toggleModeBtn);
+
+        const modeBadge = document.createElement('div');
+        modeBadge.textContent = 'Touch Mode';
+        modeBadge.style.cssText = 'position:absolute; top:75px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.5); backdrop-filter:blur(10px); color:white; padding:6px 16px; border-radius:20px; font-size:0.9rem; font-weight:600; z-index:900; pointer-events:none; opacity:0.8; transition:opacity 0.3s;';
+        container.appendChild(modeBadge);
+
+        toggleModeBtn.onclick = () => {
+            isRelativeMode = !isRelativeMode;
+            modeBadge.textContent = isRelativeMode ? 'Trackpad Mode' : 'Touch Mode';
+            modeBadge.style.opacity = '1';
+            setTimeout(() => { modeBadge.style.opacity = '0.5'; }, 1500);
+            toggleModeBtn.style.background = isRelativeMode ? '#32d74b' : 'var(--accent)';
+        };
+
+        // Attach listeners to the full window to capture drag events anywhere
+        img.addEventListener('touchstart', (e) => {
+            if (isRelativeMode) {
+                e.preventDefault();
+                lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            }
+        }, {passive: false});
+        
+        img.addEventListener('touchmove', (e) => {
+            if (isRelativeMode && lastTouch) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - lastTouch.x;
+                const dy = e.touches[0].clientY - lastTouch.y;
+                api.send('move', {dx, dy});
+                lastTouch = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            }
+        }, {passive: false});
+        
+        img.addEventListener('touchend', () => { lastTouch = null; });
+        
         root.appendChild(fullscreenContainer);
         container.appendChild(root);
 
         img.onclick = (e) => {
+            if (isRelativeMode) return;
             const rect = img.getBoundingClientRect();
             const nx = (e.clientX - rect.left) / rect.width;
             const ny = (e.clientY - rect.top) / rect.height;

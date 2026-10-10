@@ -41,84 +41,88 @@ function renderHomeScreen() {
 
     // Header controls
     const header = document.createElement('div');
-    header.style.marginBottom = '15px';
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '24px';
+    
+    const title = document.createElement('h2');
+    title.textContent = 'Modules';
+    title.style.margin = '0';
+    title.style.fontSize = '1.3rem';
+    header.appendChild(title);
     
     const editBtn = document.createElement('button');
     editBtn.textContent = isEditMode ? 'Done' : 'Edit';
+    editBtn.style.cssText = 'background:rgba(255,255,255,0.1); color:var(--accent); font-weight:600; padding:8px 16px; border-radius:20px; font-size:0.95rem;';
     editBtn.onclick = () => {
         isEditMode = !isEditMode;
+        if (isEditMode) document.body.classList.add('edit-mode');
+        else document.body.classList.remove('edit-mode');
         renderHomeScreen();
     };
     header.appendChild(editBtn);
     moduleContainer.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid-container';
+
+    // Icons map for modules
+    const icons = {
+        'screen': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
+        'keyboard': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path></svg>',
+        'touchpad': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><line x1="4" y1="12" x2="20" y2="12"></line><line x1="12" y1="12" x2="12" y2="20"></line></svg>',
+        'media': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
+        'power': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>'
+    };
 
     // Render tiles
     currentLayout.forEach((modId, index) => {
         const modInfo = availableModules.find(m => m.id === modId) || { id: modId, name: modId };
         
         const tile = document.createElement('div');
-        tile.style.border = '1px solid #ccc';
-        tile.style.padding = '15px';
-        tile.style.margin = '5px 0';
-        tile.style.borderRadius = '5px';
-        tile.style.display = 'flex';
-        tile.style.justifyContent = 'space-between';
-        tile.style.alignItems = 'center';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = modInfo.name;
-        nameSpan.style.cursor = isEditMode ? 'default' : 'pointer';
-        nameSpan.style.flexGrow = '1';
+        tile.className = 'module-tile';
+        
+        tile.innerHTML = `
+            ${icons[modId] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>'}
+            <span>${modInfo.name}</span>
+        `;
+        
         if (!isEditMode) {
-            nameSpan.onclick = () => openModule(modId);
+            tile.onclick = () => openModule(modId);
+            // Long press to enter edit mode
+            let pressTimer;
+            tile.ontouchstart = () => { pressTimer = setTimeout(() => { isEditMode = true; document.body.classList.add('edit-mode'); renderHomeScreen(); }, 600); };
+            tile.ontouchend = () => clearTimeout(pressTimer);
+            tile.onmousedown = tile.ontouchstart;
+            tile.onmouseup = tile.ontouchend;
+            tile.onmouseleave = tile.ontouchend;
         }
-        tile.appendChild(nameSpan);
 
         if (isEditMode) {
             const controls = document.createElement('div');
-            
-            if (index > 0) {
-                const upBtn = document.createElement('button');
-                upBtn.textContent = 'Up';
-                upBtn.onclick = () => {
-                    [currentLayout[index - 1], currentLayout[index]] = [currentLayout[index], currentLayout[index - 1]];
-                    saveLayout();
-                    renderHomeScreen();
-                };
-                controls.appendChild(upBtn);
-            }
-            if (index < currentLayout.length - 1) {
-                const downBtn = document.createElement('button');
-                downBtn.textContent = 'Down';
-                downBtn.onclick = () => {
-                    [currentLayout[index + 1], currentLayout[index]] = [currentLayout[index], currentLayout[index + 1]];
-                    saveLayout();
-                    renderHomeScreen();
-                };
-                controls.appendChild(downBtn);
-            }
-            
-            const rmBtn = document.createElement('button');
-            rmBtn.textContent = 'Remove';
-            rmBtn.style.color = 'red';
-            rmBtn.onclick = () => {
+            controls.style.cssText = 'position:absolute; top:-8px; left:-8px; background:var(--danger); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+            controls.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+            controls.onclick = (e) => {
+                e.stopPropagation();
                 currentLayout.splice(index, 1);
                 saveLayout();
                 renderHomeScreen();
             };
-            controls.appendChild(rmBtn);
-            
             tile.appendChild(controls);
         }
 
-        moduleContainer.appendChild(tile);
+        grid.appendChild(tile);
     });
+    
+    moduleContainer.appendChild(grid);
 
     if (isEditMode) {
         const unadded = availableModules.filter(m => !currentLayout.includes(m.id));
         if (unadded.length > 0) {
             const addSelect = document.createElement('select');
-            addSelect.innerHTML = '<option value="">-- Add a remote --</option>';
+            addSelect.style.cssText = 'margin-top: 24px; width: 100%; padding: 12px; border-radius: 12px; background: var(--card); color: white; border: 1px solid rgba(255,255,255,0.1); font-size: 1rem; outline: none;';
+            addSelect.innerHTML = '<option value="">+ Add Module</option>';
             unadded.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.id;
@@ -144,32 +148,53 @@ function saveLayout() {
     }
 }
 
-async function openModule(id) {
+function closeActiveModule() {
     if (activeModule) {
         activeModule.unmount();
         ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
-        activeModuleContainer.innerHTML = '';
+    }
+    activeModule = null;
+    activeModuleId = null;
+    activeModuleContainer.innerHTML = '';
+    renderHomeScreen();
+}
+
+window.addEventListener('popstate', (e) => {
+    if (activeModule) {
+        closeActiveModule();
+    }
+});
+
+async function openModule(id) {
+    if (activeModule) {
+        closeActiveModule();
     }
     
+    window.history.pushState({module: id}, '', '#' + id);
+    
     moduleContainer.style.display = 'none';
-    activeModuleContainer.style.display = 'block';
+    activeModuleContainer.style.display = 'flex';
+    
+    const headerBar = document.createElement('div');
+    headerBar.style.cssText = 'width:100%; height:60px; background:rgba(0,0,0,0.65); backdrop-filter:blur(20px); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; padding:0 16px; z-index:1000; flex-shrink:0;';
     
     const backBtn = document.createElement('button');
-    backBtn.textContent = 'Back';
-    backBtn.style.marginBottom = '10px';
+    backBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:4px;"><polyline points="15 18 9 12 15 6"></polyline></svg> Home';
+    backBtn.style.cssText = 'background:transparent; color:var(--accent); font-weight:600; font-size:1.1rem; display:flex; align-items:center; padding:8px 0; border:none;';
     backBtn.onclick = () => {
-        if (activeModule) {
-            activeModule.unmount();
-            ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
-        }
-        activeModule = null;
-        activeModuleId = null;
-        activeModuleContainer.innerHTML = '';
-        renderHomeScreen();
+        window.history.back(); // Triggers popstate which calls closeActiveModule
     };
-    activeModuleContainer.appendChild(backBtn);
+    
+    const title = document.createElement('span');
+    title.textContent = availableModules.find(m => m.id === id)?.name || id;
+    title.style.cssText = 'position:absolute; left:50%; transform:translateX(-50%); font-weight:600; font-size:1.1rem;';
+    
+    headerBar.appendChild(backBtn);
+    headerBar.appendChild(title);
+    activeModuleContainer.appendChild(headerBar);
 
     const modContainer = document.createElement('div');
+    modContainer.style.cssText = 'flex:1; width:100%; position:relative; overflow:auto;';
     activeModuleContainer.appendChild(modContainer);
 
     try {
@@ -231,21 +256,34 @@ function connect() {
         if (msg.m === 'core') {
             if (msg.t === 'need_pin') {
                 showAuthOverlay(`
-                    <h2>Enter PIN</h2>
-                    <input type="tel" id="pin-input" maxlength="6" style="font-size:24px; letter-spacing:10px; width:200px; text-align:center; padding:10px; border-radius:5px; border:none; margin-bottom: 20px;">
-                    <br>
-                    <button id="pin-submit" style="padding:10px 20px; font-size:18px; border-radius:5px; border:none; background:#2196f3; color:white;">Submit</button>
-                    <p id="pin-error" style="color:#f44336; margin-top:10px; display:none;"></p>
+                    <h2 style="font-size:2rem; font-weight:700; margin-bottom:12px;">Enter PIN</h2>
+                    <p style="color:var(--muted); margin-bottom:32px;">Please enter the 6-digit PIN displayed on your PC.</p>
+                    <input type="tel" id="pin-input" class="pin-input" maxlength="6" placeholder="••••••">
+                    <button id="pin-submit" style="margin-top:24px; width:80%; max-width:300px; padding:18px; font-size:1.2rem; font-weight:700; border-radius:16px; background:white; color:black; border:none; box-shadow:0 8px 24px rgba(255,255,255,0.2);">Connect</button>
+                    <p id="pin-error" style="color:var(--danger); margin-top:20px; font-weight:600; display:none;"></p>
                 `);
-                document.getElementById('pin-submit').onclick = () => {
-                    const pin = document.getElementById('pin-input').value;
+                
+                const pinInput = document.getElementById('pin-input');
+                pinInput.focus();
+                
+                const submitPin = () => {
+                    const pin = pinInput.value;
                     if (pin.length === 6) {
                         let deviceId = localStorage.getItem('pr_device_id') || '';
                         ws.send(JSON.stringify({m: 'core', t: 'pin', d: {pin, deviceId}}));
+                    } else {
+                        document.getElementById('pin-error').textContent = 'PIN must be 6 digits';
+                        document.getElementById('pin-error').style.display = 'block';
                     }
                 };
+                
+                document.getElementById('pin-submit').onclick = submitPin;
+                pinInput.onkeyup = (e) => {
+                    if (e.key === 'Enter') submitPin();
+                };
             } else if (msg.t === 'pending_approval') {
-                showAuthOverlay(`<h2>Waiting for approval on the laptop...</h2><p>Please check your PC terminal.</p>`);
+                showAuthOverlay(`<svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--accent)" stroke-width="2" fill="none" style="margin-bottom:20px; animation: jiggle 2s infinite;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <h2 style="font-size:1.5rem; font-weight:600; margin-bottom:12px;">Waiting for approval...</h2><p style="color:var(--muted);">Please accept the connection on your PC.</p>`);
             } else if (msg.t === 'paired') {
                 localStorage.setItem('pr_token', msg.d.token);
                 localStorage.setItem('pr_device_id', msg.d.deviceId);
@@ -264,11 +302,13 @@ function connect() {
                     const err = document.getElementById('pin-error');
                     if (err) { err.textContent = 'Incorrect PIN'; err.style.display = 'block'; }
                 } else if (msg.d.type === 'locked_out') {
-                    showAuthOverlay(`<h2 style="color:#f44336;">Locked Out</h2><p>Too many attempts. Try again later.</p>`);
+                    showAuthOverlay(`<svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:20px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <h2 style="font-size:2rem; font-weight:700; color:var(--danger); margin-bottom:12px;">Locked Out</h2><p style="color:var(--muted); font-size:1.1rem;">Too many attempts. Try again later.</p>`);
                 } else if (msg.d.type === 'revoked') {
                     localStorage.removeItem('pr_token');
                     localStorage.removeItem('pr_device_id');
-                    showAuthOverlay(`<h2>Device Revoked</h2><p>Please refresh the page to pair again.</p>`);
+                    showAuthOverlay(`<svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:20px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                        <h2 style="font-size:2rem; font-weight:700; margin-bottom:12px;">Device Revoked</h2><p style="color:var(--muted); font-size:1.1rem;">Please refresh the page to pair again.</p>`);
                 }
             } else if (msg.t === 'ready') {
                 hideAuthOverlay();
