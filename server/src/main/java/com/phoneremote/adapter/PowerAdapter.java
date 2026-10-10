@@ -6,5 +6,6 @@ public interface PowerAdapter {
     void sleep();
     void hibernate();
     void lock();
+    void delayedShutdown(int seconds);
     void cancelPending();
 }

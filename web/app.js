@@ -1,11 +1,13 @@
 import touchpad from './modules/touchpad.js';
 import keyboard from './modules/keyboard.js';
 import media from './modules/media.js';
+import power from './modules/power.js';
 
 const clientModules = {
     touchpad,
     keyboard,
-    media
+    media,
+    power
 };
 
 const statusIndicator = document.getElementById('status-indicator');
@@ -18,6 +20,7 @@ let reconnectTimer = null;
 let pingInterval = null;
 let currentDelay = 500;
 let activeModule = null;
+let activeModuleApi = null;
 
 function updateStatus(state, text) {
     statusIndicator.className = state;
@@ -80,8 +83,10 @@ function connect() {
                 const rtt = Date.now() - (msg.i || 0);
                 updateStatus('connected', `Connected (${rtt}ms)`);
             }
-        } else {
-            // Unhandled module message from server (e.g., config changes later)
+        } else if (activeModule && msg.m === activeModule.id) {
+            if (typeof activeModuleApi.on === 'function') {
+                activeModuleApi.on(msg.t, msg.d);
+            }
         }
     };
     
@@ -107,18 +112,16 @@ function openModule(id) {
     activeModule = mod;
     ws.send(JSON.stringify({m: 'core', t: 'open', d: {module: id}}));
     
-    const api = {
+    activeModuleApi = {
         send: (type, data) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({m: id, t: type, d: data}));
             }
         },
-        on: (type, fn) => {
-            // Not needed for step 2
-        }
+        on: null // Can be overridden by the module
     };
     
-    mod.mount(activeModuleContainer, api);
+    mod.mount(activeModuleContainer, activeModuleApi);
 }
 
 function cleanup() {

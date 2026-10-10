@@ -71,6 +71,9 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
 
     private void handleCoreMessage(Session session, JsonNode root, String t, JsonNode d) throws Exception {
         if ("hello".equals(t)) {
+            String deviceName = d.path("deviceName").asText("Unknown Device");
+            session.setAttribute("deviceName", deviceName);
+
             ObjectNode response = mapper.createObjectNode();
             response.put("m", "core");
             response.put("t", "ready");

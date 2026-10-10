@@ -28,5 +28,8 @@ public class FakePowerAdapter implements PowerAdapter {
     public void lock() { calls.add("lock()"); }
 
     @Override
+    public void delayedShutdown(int seconds) { calls.add("delayedShutdown(" + seconds + ")"); }
+
+    @Override
     public void cancelPending() { calls.add("cancelPending()"); }
 }
