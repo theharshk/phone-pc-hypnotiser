@@ -114,15 +114,36 @@ public class RobotInputAdapter implements InputAdapter {
         robot.mouseWheel(amount);
     }
 
-    @Override
-    public void keyDown(int keyCode) { }
+    private final JnaKeyboard jnaKeyboard = new JnaKeyboard();
 
     @Override
-    public void keyUp(int keyCode) { }
+    public void keyDown(int keyCode) {
+        jnaKeyboard.keyDown(keyCode);
+    }
 
     @Override
-    public void typeText(String text) { }
+    public void keyUp(int keyCode) {
+        jnaKeyboard.keyUp(keyCode);
+    }
 
     @Override
-    public void mediaKey(MediaKey key) { }
+    public void typeText(String text) {
+        jnaKeyboard.typeText(text);
+    }
+
+    @Override
+    public void mediaKey(MediaKey key) {
+        int vk = 0;
+        switch (key) {
+            case PLAY_PAUSE: vk = 0xB3; break; // VK_MEDIA_PLAY_PAUSE
+            case NEXT: vk = 0xB0; break;       // VK_MEDIA_NEXT_TRACK
+            case PREV: vk = 0xB1; break;       // VK_MEDIA_PREV_TRACK
+            case VOL_UP: vk = 0xAF; break;     // VK_VOLUME_UP
+            case VOL_DOWN: vk = 0xAE; break;   // VK_VOLUME_DOWN
+            case MUTE: vk = 0xAD; break;       // VK_VOLUME_MUTE
+        }
+        if (vk != 0) {
+            jnaKeyboard.mediaKey(vk);
+        }
+    }
 }

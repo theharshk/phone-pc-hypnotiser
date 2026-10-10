@@ -1,7 +1,11 @@
 import touchpad from './modules/touchpad.js';
+import keyboard from './modules/keyboard.js';
+import media from './modules/media.js';
 
 const clientModules = {
-    touchpad
+    touchpad,
+    keyboard,
+    media
 };
 
 const statusIndicator = document.getElementById('status-indicator');
