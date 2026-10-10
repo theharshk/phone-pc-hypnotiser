@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 public class ScreenModule implements RemoteModule {
 
     private static final Logger logger = LoggerFactory.getLogger(ScreenModule.class);
+    private static final Logger frameLogger = LoggerFactory.getLogger("com.phoneremote.frames");
     public static final ScreenStats globalStats = new ScreenStats();
 
     private final ScreenAdapter screenAdapter;
@@ -160,7 +161,7 @@ public class ScreenModule implements RemoteModule {
                                     while (!encodeQueue.offer(fd)) {
                                         FrameData dropped = encodeQueue.poll();
                                         if (dropped != null) {
-                                            logger.debug("DROPPED frame at encode stage");
+                                            frameLogger.debug("DROPPED frame at encode stage");
                                             globalStats.addStat(0, 0, 0, 0, true);
                                         }
                                     }
@@ -227,7 +228,7 @@ public class ScreenModule implements RemoteModule {
                         while (!sendQueue.offer(fd)) {
                             FrameData dropped = sendQueue.poll();
                             if (dropped != null) {
-                                logger.debug("DROPPED frame at send stage");
+                                frameLogger.debug("DROPPED frame at send stage");
                                 globalStats.addStat(0, 0, 0, 0, true);
                             }
                         }
@@ -275,7 +276,7 @@ public class ScreenModule implements RemoteModule {
                         long encMs = fd.encodeEnd - fd.encodeStart;
 
                         globalStats.addStat(capMs, scaleMs, encMs, fd.jpeg.length / 1024, false);
-                        logger.debug("Capture: {}ms, EncWait: {}ms, Scale: {}ms, Encode: {}ms, SendWait: {}ms, Size: {}KB", 
+                        frameLogger.debug("Capture: {}ms, EncWait: {}ms, Scale: {}ms, Encode: {}ms, SendWait: {}ms, Size: {}KB", 
                                      capMs, fd.encWaitMs, scaleMs, encMs, sendWaitMs, fd.jpeg.length / 1024);
                     }
                 } catch (InterruptedException e) {

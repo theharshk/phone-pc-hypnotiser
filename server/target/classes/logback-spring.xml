@@ -15,20 +15,33 @@
         </encoder>
     </appender>
 
-    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="FILE" />
+    <appender name="FRAME_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/frames.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/frames-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>3</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_FRAME_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FRAME_FILE" />
         <queueSize>1024</queueSize>
         <discardingThreshold>0</discardingThreshold>
         <neverBlock>true</neverBlock>
     </appender>
 
-    <appender name="IN_MEMORY" class="com.phoneremote.logging.InMemoryLogAppender" />
+    <logger name="com.phoneremote.frames" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_FRAME_FILE" />
+    </logger>
 
-    <logger name="com.phoneremote" level="DEBUG" />
+    <logger name="com.phoneremote" level="INFO" />
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
-        <appender-ref ref="ASYNC_FILE" />
-        <appender-ref ref="IN_MEMORY" />
+        <appender-ref ref="FILE" />
     </root>
 </configuration>

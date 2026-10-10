@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import jakarta.annotation.PostConstruct;
+
 @Controller
 @RequestMapping("/admin")
 public class AdminController {
@@ -26,6 +28,18 @@ public class AdminController {
         this.configStore = configStore;
         this.pendingApprovalStore = pendingApprovalStore;
         this.lockoutTracker = lockoutTracker;
+    }
+
+    @PostConstruct
+    public void initLogging() {
+        ch.qos.logback.classic.LoggerContext lc = (ch.qos.logback.classic.LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory();
+        ch.qos.logback.classic.Logger rootLogger = lc.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        com.phoneremote.logging.InMemoryLogAppender appender = new com.phoneremote.logging.InMemoryLogAppender();
+        appender.setContext(lc);
+        appender.start();
+        rootLogger.addAppender(appender);
+        
+        org.slf4j.LoggerFactory.getLogger(AdminController.class).info("Logging started");
     }
 
     private boolean isLoopback(HttpServletRequest request) {
@@ -292,6 +306,7 @@ public class AdminController {
         html.append("      if(l.level==='ERROR') cls='error';");
         html.append("      out += `<span class='${cls}'>${l.formatted}</span>\\n`;");
         html.append("    });");
+        html.append("    if (out === '') out = '<i>No logs in buffer.</i>';");
         html.append("    document.getElementById('logOutput').innerHTML = out;");
         html.append("  });");
         html.append("}");

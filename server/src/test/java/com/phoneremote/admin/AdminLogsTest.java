@@ -22,6 +22,7 @@ class AdminLogsTest {
     @BeforeEach
     void setUp() {
         controller = new AdminController(null, null, null);
+        controller.initLogging();
     }
 
     @Test
@@ -94,17 +95,18 @@ class AdminLogsTest {
     @Test
     void testLogbackConfiguration() {
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.classic.Logger frameLogger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("com.phoneremote.frames");
         
-        ch.qos.logback.classic.AsyncAppender asyncAppender = (ch.qos.logback.classic.AsyncAppender) root.getAppender("ASYNC_FILE");
-        assertNotNull(asyncAppender, "ASYNC_FILE appender should be present to prevent blocking capture thread");
+        ch.qos.logback.classic.AsyncAppender asyncAppender = (ch.qos.logback.classic.AsyncAppender) frameLogger.getAppender("ASYNC_FRAME_FILE");
+        assertNotNull(asyncAppender, "ASYNC_FRAME_FILE appender should be present to prevent blocking capture thread");
         assertTrue(asyncAppender.isNeverBlock(), "neverBlock must be true to protect capture thread");
 
-        ch.qos.logback.core.rolling.RollingFileAppender fileAppender = (ch.qos.logback.core.rolling.RollingFileAppender) asyncAppender.getAppender("FILE");
+        ch.qos.logback.core.rolling.RollingFileAppender fileAppender = (ch.qos.logback.core.rolling.RollingFileAppender) asyncAppender.getAppender("FRAME_FILE");
         assertNotNull(fileAppender);
         ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy policy = (ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy) fileAppender.getTriggeringPolicy();
-        assertEquals(3, policy.getMaxHistory(), "Must keep exactly 3 files");
+        assertEquals(3, policy.getMaxHistory(), "Must keep exactly 3 files for frames");
 
-        ch.qos.logback.classic.Logger phoneRemoteLogger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("com.phoneremote");
-        assertEquals(ch.qos.logback.classic.Level.DEBUG, phoneRemoteLogger.getLevel(), "com.phoneremote must default to DEBUG for frame logging");
+        assertEquals(ch.qos.logback.classic.Level.DEBUG, frameLogger.getLevel(), "com.phoneremote.frames must default to DEBUG for frame logging");
+        assertFalse(frameLogger.isAdditive(), "Frame logs must not be additive to prevent filling the App log");
     }
 }
