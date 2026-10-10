@@ -194,6 +194,44 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             String moduleId = d.path("module").asText("");
             RemoteModule module = moduleRegistry.get(moduleId);
             if (module != null) session.execute(() -> module.onClose(session));
+        } else if ("get_layout".equals(t) && session.isAuthenticated()) {
+            ConfigStore.DeviceInfo dInfo = configStore.getDevice(session.getDeviceId());
+            if (dInfo != null) {
+                ObjectNode response = mapper.createObjectNode();
+                response.put("m", "core");
+                response.put("t", "layout");
+                ObjectNode dNode = mapper.createObjectNode();
+                
+                ArrayNode layoutArr = mapper.createArrayNode();
+                for (String modId : dInfo.layout) {
+                    layoutArr.add(modId);
+                }
+                dNode.set("layout", layoutArr);
+
+                ArrayNode availArr = mapper.createArrayNode();
+                for (RemoteModule mod : moduleRegistry.getAll()) {
+                    ObjectNode mObj = mapper.createObjectNode();
+                    mObj.put("id", mod.id());
+                    mObj.put("name", mod.displayName());
+                    availArr.add(mObj);
+                }
+                dNode.set("available", availArr);
+                
+                response.set("d", dNode);
+                session.send(mapper.writeValueAsString(response));
+            }
+        } else if ("set_layout".equals(t) && session.isAuthenticated()) {
+            JsonNode layoutNode = d.path("layout");
+            if (layoutNode.isArray()) {
+                java.util.List<String> newLayout = new java.util.ArrayList<>();
+                for (JsonNode n : layoutNode) {
+                    String modId = n.asText();
+                    if (newLayout.size() < 20 && !newLayout.contains(modId) && moduleRegistry.get(modId) != null) {
+                        newLayout.add(modId);
+                    }
+                }
+                configStore.updateDeviceLayout(session.getDeviceId(), newLayout);
+            }
         }
     }
 
@@ -256,6 +294,16 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             modulesArr.add(mObj);
         }
         data.set("modules", modulesArr);
+
+        ConfigStore.DeviceInfo dInfo = configStore.getDevice(session.getDeviceId());
+        if (dInfo != null && dInfo.layout != null) {
+            ArrayNode layoutArr = mapper.createArrayNode();
+            for (String modId : dInfo.layout) {
+                layoutArr.add(modId);
+            }
+            data.set("layout", layoutArr);
+        }
+
         response.set("d", data);
 
         session.send(mapper.writeValueAsString(response));

@@ -27,6 +27,8 @@ public class ConfigStore {
         public long created;
         public long lastSeen;
         public String lastIp;
+        public List<String> layout = new ArrayList<>(List.of("touchpad", "keyboard", "media", "power"));
+        public java.util.Map<String, com.fasterxml.jackson.databind.JsonNode> settings = new java.util.HashMap<>();
     }
 
     public static class ConfigData {
@@ -137,6 +139,34 @@ public class ConfigStore {
         try {
             config.devices.removeIf(d -> d.deviceId.equals(deviceId));
             save();
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    public DeviceInfo getDevice(String deviceId) {
+        lock.readLock().lock();
+        try {
+            for (DeviceInfo d : config.devices) {
+                if (d.deviceId.equals(deviceId)) return d;
+            }
+            return null;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public boolean updateDeviceLayout(String deviceId, List<String> layout) {
+        lock.writeLock().lock();
+        try {
+            for (DeviceInfo d : config.devices) {
+                if (d.deviceId.equals(deviceId)) {
+                    d.layout = new ArrayList<>(layout);
+                    save();
+                    return true;
+                }
+            }
+            return false;
         } finally {
             lock.writeLock().unlock();
         }
