@@ -1,10 +1,19 @@
+import touchpad from './modules/touchpad.js';
+
+const clientModules = {
+    touchpad
+};
+
 const statusIndicator = document.getElementById('status-indicator');
 const statusText = document.getElementById('status-text');
+const moduleContainer = document.getElementById('module-container');
+const activeModuleContainer = document.getElementById('active-module');
 
 let ws = null;
 let reconnectTimer = null;
 let pingInterval = null;
 let currentDelay = 500;
+let activeModule = null;
 
 function updateStatus(state, text) {
     statusIndicator.className = state;
@@ -14,18 +23,15 @@ function updateStatus(state, text) {
 function connect() {
     updateStatus('reconnecting', 'Connecting...');
     
-    // Determine websocket URL based on current host
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use host and port of the page
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
         updateStatus('reconnecting', 'Authenticating...');
-        currentDelay = 500; // Reset delay on success
+        currentDelay = 500;
         
-        // Send hello
         ws.send(JSON.stringify({
             m: 'core',
             t: 'hello',
@@ -39,13 +45,23 @@ function connect() {
     
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        console.log('Received:', msg);
         
         if (msg.m === 'core') {
             if (msg.t === 'ready') {
                 updateStatus('connected', 'Connected');
                 
-                // Start heartbeat
+                moduleContainer.innerHTML = '';
+                msg.d.modules.forEach(mInfo => {
+                    if (clientModules[mInfo.id]) {
+                        const btn = document.createElement('button');
+                        btn.textContent = `Open ${mInfo.name}`;
+                        btn.style.margin = '5px';
+                        btn.style.padding = '10px';
+                        btn.onclick = () => openModule(mInfo.id);
+                        moduleContainer.appendChild(btn);
+                    }
+                });
+                
                 if (pingInterval) clearInterval(pingInterval);
                 pingInterval = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
@@ -60,6 +76,8 @@ function connect() {
                 const rtt = Date.now() - (msg.i || 0);
                 updateStatus('connected', `Connected (${rtt}ms)`);
             }
+        } else {
+            // Unhandled module message from server (e.g., config changes later)
         }
     };
     
@@ -74,25 +92,49 @@ function connect() {
     };
 }
 
+function openModule(id) {
+    if (activeModule) {
+        activeModule.unmount();
+        ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModule.id}}));
+        activeModuleContainer.innerHTML = '';
+    }
+    
+    const mod = clientModules[id];
+    activeModule = mod;
+    ws.send(JSON.stringify({m: 'core', t: 'open', d: {module: id}}));
+    
+    const api = {
+        send: (type, data) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({m: id, t: type, d: data}));
+            }
+        },
+        on: (type, fn) => {
+            // Not needed for step 2
+        }
+    };
+    
+    mod.mount(activeModuleContainer, api);
+}
+
 function cleanup() {
     if (pingInterval) {
         clearInterval(pingInterval);
         pingInterval = null;
     }
+    if (activeModule) {
+        activeModule.unmount();
+        activeModule = null;
+    }
+    moduleContainer.innerHTML = '';
+    activeModuleContainer.innerHTML = '';
 }
 
 function scheduleReconnect() {
     updateStatus('disconnected', `Reconnecting in ${currentDelay}ms...`);
-    
     if (reconnectTimer) clearTimeout(reconnectTimer);
-    
-    reconnectTimer = setTimeout(() => {
-        connect();
-    }, currentDelay);
-    
-    // Backoff up to 5 seconds
+    reconnectTimer = setTimeout(connect, currentDelay);
     currentDelay = Math.min(currentDelay * 2, 5000);
 }
 
-// Start connection process
 connect();
