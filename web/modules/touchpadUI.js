@@ -65,7 +65,12 @@ export function createUnifiedTouchpadAndKeyboard(container, api, isOverlay = tru
     padSheet.appendChild(padHeader);
     
     const trackpadArea = document.createElement('div');
-    trackpadArea.style.cssText = 'flex:1; background:rgba(0,0,0,0.3); border-radius:16px; border:1px solid rgba(255,255,255,0.05); position:relative; touch-action:none; display:flex; flex-direction:column; justify-content:flex-end; padding:8px; user-select:none; margin-bottom:12px;';
+    trackpadArea.style.cssText = 'flex:1; background:rgba(0,0,0,0.3) radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px); background-size:16px 16px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); position:relative; touch-action:none; display:flex; flex-direction:column; justify-content:flex-end; padding:8px; align-items:center; user-select:none; margin-bottom:12px;';
+    
+    const hint = document.createElement('div');
+    hint.textContent = 'Drag to move. Tap to click. Two fingers to scroll.';
+    hint.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:var(--muted); font-size:0.95rem; text-align:center; pointer-events:none; width:80%; font-weight:500;';
+    trackpadArea.appendChild(hint);
     
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex; gap:8px; height:60px; width:100%;';

@@ -24,7 +24,7 @@ export default {
         const qualIn = document.createElement('input');
         qualIn.type = 'number';
         qualIn.min = 30; qualIn.max = 90; qualIn.value = 80;
-        qualIn.style.width = '45px';
+        qualIn.style.cssText = 'width:45px; background:transparent; border:none; color:white; border-bottom:1px solid rgba(255,255,255,0.3); font-family:var(--font-mono);';
         qualLbl.appendChild(qualIn);
         
         const scaleLbl = document.createElement('label');
@@ -32,12 +32,12 @@ export default {
         const scaleIn = document.createElement('input');
         scaleIn.type = 'number';
         scaleIn.min = 25; scaleIn.max = 100; scaleIn.value = 100;
-        scaleIn.style.width = '45px';
+        scaleIn.style.cssText = 'width:45px; background:transparent; border:none; color:white; border-bottom:1px solid rgba(255,255,255,0.3); font-family:var(--font-mono);';
         scaleLbl.appendChild(scaleIn);
         
         const applyBtn = document.createElement('button');
         applyBtn.textContent = 'Apply';
-        applyBtn.style.marginLeft = '5px';
+        applyBtn.style.cssText = 'background:var(--accent); color:var(--on-accent); border:none; border-radius:12px; padding:4px 12px; font-weight:600; margin-left:8px;';
         applyBtn.onclick = () => {
             api.send('settings', {
                 fps: parseInt(fpsIn.value),

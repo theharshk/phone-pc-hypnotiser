@@ -19,12 +19,14 @@ function updateStatus(state, text) {
     statusIndicator.className = state;
     statusText.textContent = text;
     
+    let color = '#ff453a'; // red
+    if (state === 'connected') color = '#32d74b'; // green
+    else if (state === 'reconnecting') color = '#ffbd2e'; // yellow
+    
+    statusIndicator.style.background = color;
+    
     const dot = document.getElementById('module-status-dot');
-    if (dot) {
-        if (state === 'connected') dot.style.background = '#32d74b'; // green
-        else if (state === 'reconnecting') dot.style.background = '#ffbd2e'; // yellow
-        else dot.style.background = '#ff453a'; // red
-    }
+    if (dot) dot.style.background = color;
 }
 
 const authOverlay = document.createElement('div');
@@ -46,35 +48,26 @@ function renderHomeScreen() {
     moduleContainer.style.display = 'block';
     activeModuleContainer.style.display = 'none';
 
-    // Header controls
-    const header = document.createElement('div');
-    header.style.display = 'flex';
-    header.style.justifyContent = 'space-between';
-    header.style.alignItems = 'center';
-    header.style.marginBottom = '24px';
-    
-    const title = document.createElement('h2');
-    title.textContent = 'Modules';
-    title.style.margin = '0';
-    title.style.fontSize = '1.3rem';
-    header.appendChild(title);
-    
-    const editBtn = document.createElement('button');
-    editBtn.textContent = isEditMode ? 'Done' : 'Edit';
-    editBtn.style.cssText = 'background:rgba(255,255,255,0.1); color:var(--accent); font-weight:600; padding:8px 16px; border-radius:20px; font-size:0.95rem;';
-    editBtn.onclick = () => {
-        isEditMode = !isEditMode;
-        if (isEditMode) document.body.classList.add('edit-mode');
-        else document.body.classList.remove('edit-mode');
-        renderHomeScreen();
-    };
-    header.appendChild(editBtn);
-    moduleContainer.appendChild(header);
+    // Hook up static header buttons
+    const editBtn = document.getElementById('edit-btn');
+    if(editBtn) {
+        editBtn.textContent = isEditMode ? 'Done' : 'Edit';
+        editBtn.onclick = () => {
+            isEditMode = !isEditMode;
+            if (isEditMode) document.body.classList.add('edit-mode');
+            else document.body.classList.remove('edit-mode');
+            renderHomeScreen();
+        };
+    }
+
+    const settingsBtn = document.getElementById('settings-btn');
+    if(settingsBtn) {
+        settingsBtn.onclick = () => openModule('settings');
+    }
 
     const grid = document.createElement('div');
     grid.className = 'grid-container';
 
-    // Icons map for modules
     const icons = {
         'screen': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
         'keyboard': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path></svg>',
@@ -83,21 +76,34 @@ function renderHomeScreen() {
         'power': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>'
     };
 
-    // Render tiles
+    const descriptions = {
+        'screen': 'Live mirror',
+        'keyboard': 'Typing & hotkeys',
+        'touchpad': 'Mouse control',
+        'media': 'Playback controls',
+        'power': 'System states'
+    };
+
     currentLayout.forEach((modId, index) => {
         const modInfo = availableModules.find(m => m.id === modId) || { id: modId, name: modId };
-        
         const tile = document.createElement('div');
         tile.className = 'module-tile';
+        if (index === 0) tile.classList.add('hero');
+        if (index === 1) tile.classList.add('black-card');
         
-        tile.innerHTML = `
+        const inner = document.createElement('div');
+        inner.innerHTML = `
             ${icons[modId] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>'}
-            <span>${modInfo.name}</span>
+            <div>
+                <h3>${modInfo.name}</h3>
+                <p>${descriptions[modId] || 'Remote control'}</p>
+            </div>
         `;
+        
+        tile.appendChild(inner);
         
         if (!isEditMode) {
             tile.onclick = () => openModule(modId);
-            // Long press to enter edit mode
             let pressTimer;
             tile.ontouchstart = () => { pressTimer = setTimeout(() => { isEditMode = true; document.body.classList.add('edit-mode'); renderHomeScreen(); }, 600); };
             tile.ontouchend = () => clearTimeout(pressTimer);
@@ -108,7 +114,7 @@ function renderHomeScreen() {
 
         if (isEditMode) {
             const controls = document.createElement('div');
-            controls.style.cssText = 'position:absolute; top:-8px; left:-8px; background:var(--danger); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+            controls.style.cssText = 'position:absolute; top:-8px; left:-8px; background:var(--danger); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3); z-index:10;';
             controls.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
             controls.onclick = (e) => {
                 e.stopPropagation();
@@ -117,6 +123,39 @@ function renderHomeScreen() {
                 renderHomeScreen();
             };
             tile.appendChild(controls);
+
+            // Reorder controls
+            const reorder = document.createElement('div');
+            reorder.style.cssText = 'position:absolute; top:-8px; right:-8px; display:flex; gap:4px; z-index:10;';
+            if (index > 0) {
+                const upBtn = document.createElement('div');
+                upBtn.style.cssText = 'background:var(--accent); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:white; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+                upBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+                upBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const tmp = currentLayout[index];
+                    currentLayout[index] = currentLayout[index - 1];
+                    currentLayout[index - 1] = tmp;
+                    saveLayout();
+                    renderHomeScreen();
+                };
+                reorder.appendChild(upBtn);
+            }
+            if (index < currentLayout.length - 1) {
+                const downBtn = document.createElement('div');
+                downBtn.style.cssText = 'background:var(--accent); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:white; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+                downBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+                downBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const tmp = currentLayout[index];
+                    currentLayout[index] = currentLayout[index + 1];
+                    currentLayout[index + 1] = tmp;
+                    saveLayout();
+                    renderHomeScreen();
+                };
+                reorder.appendChild(downBtn);
+            }
+            tile.appendChild(reorder);
         }
 
         grid.appendChild(tile);
@@ -124,12 +163,22 @@ function renderHomeScreen() {
     
     moduleContainer.appendChild(grid);
 
-    if (isEditMode) {
-        const unadded = availableModules.filter(m => !currentLayout.includes(m.id));
-        if (unadded.length > 0) {
+    const unadded = availableModules.filter(m => !currentLayout.includes(m.id));
+    if (unadded.length > 0) {
+        if (!isEditMode) {
+            const addBtn = document.createElement('button');
+            addBtn.className = 'add-remote-btn';
+            addBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add a remote';
+            addBtn.onclick = () => {
+                isEditMode = true;
+                document.body.classList.add('edit-mode');
+                renderHomeScreen();
+            };
+            moduleContainer.appendChild(addBtn);
+        } else {
             const addSelect = document.createElement('select');
-            addSelect.style.cssText = 'margin-top: 24px; width: 100%; padding: 12px; border-radius: 12px; background: var(--card); color: white; border: 1px solid rgba(255,255,255,0.1); font-size: 1rem; outline: none;';
-            addSelect.innerHTML = '<option value="">+ Add Module</option>';
+            addSelect.style.cssText = 'margin-top: 24px; width: 100%; padding: 16px; border-radius: 20px; background: transparent; color: var(--text); border: 2px dashed var(--border); font-size: 1.1rem; outline: none; text-align:center; appearance:none; font-weight:600;';
+            addSelect.innerHTML = '<option value="">+ Add Module...</option>';
             unadded.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.id;
@@ -147,30 +196,6 @@ function renderHomeScreen() {
         }
     }
 }
-
-function saveLayout() {
-    localStorage.setItem('pr_layout', JSON.stringify(currentLayout));
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({m: 'core', t: 'set_layout', d: {layout: currentLayout}}));
-    }
-}
-
-function closeActiveModule() {
-    if (activeModule) {
-        activeModule.unmount();
-        ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
-    }
-    activeModule = null;
-    activeModuleId = null;
-    activeModuleContainer.innerHTML = '';
-    renderHomeScreen();
-}
-
-window.addEventListener('popstate', (e) => {
-    if (activeModule) {
-        closeActiveModule();
-    }
-});
 
 async function openModule(id) {
     if (activeModule) {
@@ -272,13 +297,20 @@ function connect() {
         
         if (msg.m === 'core') {
             if (msg.t === 'need_pin') {
-                showAuthOverlay(`
-                    <h2 style="font-size:2rem; font-weight:700; margin-bottom:12px;">Enter PIN</h2>
-                    <p style="color:var(--muted); margin-bottom:32px;">Please enter the 6-digit PIN displayed on your PC.</p>
-                    <input type="tel" id="pin-input" class="pin-input" maxlength="6" placeholder="••••••">
-                    <button id="pin-submit" style="margin-top:24px; width:80%; max-width:300px; padding:18px; font-size:1.2rem; font-weight:700; border-radius:16px; background:white; color:black; border:none; box-shadow:0 8px 24px rgba(255,255,255,0.2);">Connect</button>
-                    <p id="pin-error" style="color:var(--danger); margin-top:20px; font-weight:600; display:none;"></p>
-                `);
+showAuthOverlay(`
+<div style="background:var(--surface); padding:40px 24px; border-radius:32px; width:90%; max-width:360px; display:flex; flex-direction:column; align-items:center; box-shadow:0 24px 60px rgba(0,0,0,0.4);">
+    <h2 style="margin-bottom:12px; font-weight:800; font-size:2rem; color:var(--text); letter-spacing:-0.5px;">Enter PIN</h2>
+    <p style="margin-bottom:32px; color:var(--muted); font-size:1.1rem;">Check your host PC</p>
+    <input type="tel" id="pin-input" maxlength="6" placeholder="..." style="background:var(--ground); color:var(--text); border:2px solid var(--border); border-radius:16px; font-size:2.5rem; padding:16px; text-align:center; width:100%; box-sizing:border-box; outline:none; font-family:var(--font-mono); letter-spacing:12px; margin-bottom:12px;">
+    <p id="pin-error" style="color:var(--danger); font-weight:600; min-height:24px; margin-bottom:24px; display:none;"></p>
+    <button id="pin-submit" style="width:100%; padding:18px; font-size:1.2rem; font-weight:700; border-radius:16px; background:var(--accent); color:var(--on-accent); border:none;">Connect</button>
+</div>`);
+
+
+
+
+
+
                 
                 const pinInput = document.getElementById('pin-input');
                 pinInput.focus();
@@ -406,3 +438,36 @@ if (cached) {
 }
 
 connect();
+function closeActiveModule() {
+    if (activeModule) {
+        if (api && api._ws) {
+            api._ws.close();
+        }
+        if (activeModule.unmount) {
+            activeModule.unmount();
+        }
+        activeModule = null;
+        api = null;
+        
+        activeModuleContainer.innerHTML = '';
+        activeModuleContainer.style.display = 'none';
+        moduleContainer.style.display = 'block';
+        const mdot = document.getElementById('module-status-dot'); if (mdot) mdot.style.background = 'var(--text)'; // reset to white/gray on home
+        
+        // Ensure no stray body classes
+        document.body.classList.remove('edit-mode');
+        isEditMode = false;
+        renderHomeScreen();
+    }
+}
+
+window.onpopstate = (e) => {
+    if (e.state && e.state.module) {
+        // If we popped to a module state, but we are already in a module, close it first
+        if (activeModule) closeActiveModule();
+        openModule(e.state.module);
+    } else {
+        // We popped back to home
+        if (activeModule) closeActiveModule();
+    }
+};
