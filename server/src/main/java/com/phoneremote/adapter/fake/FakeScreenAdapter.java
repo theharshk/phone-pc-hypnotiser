@@ -14,14 +14,21 @@ public class FakeScreenAdapter implements ScreenAdapter {
     public final List<String> calls = new ArrayList<>();
 
     @Override
-    public List<Object> monitors() {
+    public List<MonitorInfo> monitors() {
         calls.add("monitors()");
-        return new ArrayList<>();
+        List<MonitorInfo> list = new ArrayList<>();
+        list.add(new MonitorInfo(0, new java.awt.Rectangle(0, 0, 1920, 1080)));
+        return list;
     }
 
     @Override
     public BufferedImage capture(int monitorIndex) {
         calls.add("capture(" + monitorIndex + ")");
-        return new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        return new BufferedImage(1920, 1080, BufferedImage.TYPE_INT_RGB);
+    }
+
+    @Override
+    public java.awt.Point getCursorPosition() {
+        return new java.awt.Point(960, 540);
     }
 }

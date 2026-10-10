@@ -188,7 +188,8 @@ async function openModule(id) {
                     ws.send(JSON.stringify({m: id, t: type, d: data}));
                 }
             },
-            on: null
+            on: null,
+            _ws: ws
         };
         
         activeModule.mount(modContainer, activeModuleApi);

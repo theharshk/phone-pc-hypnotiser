@@ -62,6 +62,18 @@ public class Session {
         }
     }
 
+    public void sendBinary(byte[] payload) {
+        synchronized (wsSession) {
+            if (wsSession.isOpen()) {
+                try {
+                    wsSession.sendMessage(new org.springframework.web.socket.BinaryMessage(payload));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     public void execute(Runnable task) {
         if (!executor.isShutdown()) {
             executor.submit(task);
