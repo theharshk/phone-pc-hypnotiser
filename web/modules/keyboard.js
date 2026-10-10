@@ -1,3 +1,5 @@
+import { createUnifiedTouchpadAndKeyboard } from './touchpadUI.js';
+
 export default {
     id: 'keyboard',
     name: 'Keyboard',
@@ -8,33 +10,24 @@ export default {
         this.api = api;
         
         el.innerHTML = `
-            <div style="padding: 10px; background: #222; border-radius: 8px;">
-                <div style="display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap;">
-                    <button id="kb-ctrl" style="flex:1; padding: 10px; border: none; border-radius: 4px;">Ctrl</button>
-                    <button id="kb-alt" style="flex:1; padding: 10px; border: none; border-radius: 4px;">Alt</button>
-                    <button id="kb-shift" style="flex:1; padding: 10px; border: none; border-radius: 4px;">Shift</button>
-                    <button id="kb-win" style="flex:1; padding: 10px; border: none; border-radius: 4px;">Win</button>
+            <div style="padding: 16px; padding-bottom: 90px; display:flex; flex-direction:column; height: 100%; box-sizing:border-box;">
+                <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+                    <button id="kb-ctrl" style="flex:1; padding: 12px; border: none; border-radius: 12px; font-weight:bold;">Ctrl</button>
+                    <button id="kb-alt" style="flex:1; padding: 12px; border: none; border-radius: 12px; font-weight:bold;">Alt</button>
+                    <button id="kb-shift" style="flex:1; padding: 12px; border: none; border-radius: 12px; font-weight:bold;">Shift</button>
+                    <button id="kb-win" style="flex:1; padding: 12px; border: none; border-radius: 12px; font-weight:bold;">Win</button>
                 </div>
-                <div style="display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap;">
-                    <button class="sp-key" data-key="Escape" style="padding: 10px; flex: 1 1 20%;">Esc</button>
-                    <button class="sp-key" data-key="Tab" style="padding: 10px; flex: 1 1 20%;">Tab</button>
-                    <button class="sp-key" data-key="Enter" style="padding: 10px; flex: 1 1 20%;">Enter</button>
-                    <button class="sp-key" data-key="Backspace" style="padding: 10px; flex: 1 1 20%;">Bspc</button>
-                    <button class="sp-key" data-key="Delete" style="padding: 10px; flex: 1 1 20%;">Del</button>
-                    <button class="sp-key" data-key="ArrowUp" style="padding: 10px; flex: 1 1 20%;">↑</button>
-                    <button class="sp-key" data-key="ArrowDown" style="padding: 10px; flex: 1 1 20%;">↓</button>
-                    <button class="sp-key" data-key="ArrowLeft" style="padding: 10px; flex: 1 1 20%;">←</button>
-                    <button class="sp-key" data-key="ArrowRight" style="padding: 10px; flex: 1 1 20%;">→</button>
-                    <button class="sp-key" data-key="Home" style="padding: 10px; flex: 1 1 20%;">Home</button>
-                    <button class="sp-key" data-key="End" style="padding: 10px; flex: 1 1 20%;">End</button>
-                    <button class="sp-key" data-key="PageUp" style="padding: 10px; flex: 1 1 20%;">PgUp</button>
-                    <button class="sp-key" data-key="PageDown" style="padding: 10px; flex: 1 1 20%;">PgDn</button>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px;">
+                    <button class="sp-key" data-key="Escape" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">Esc</button>
+                    <button class="sp-key" data-key="Tab" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">Tab</button>
+                    <button class="sp-key" data-key="Enter" style="padding:12px; border-radius:8px; border:none; background:var(--accent); color:white; font-weight:bold;">Enter</button>
+                    <button class="sp-key" data-key="Backspace" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">Bspc</button>
+                    
+                    <button class="sp-key" data-key="ArrowLeft" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">&larr;</button>
+                    <button class="sp-key" data-key="ArrowUp" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">&uarr;</button>
+                    <button class="sp-key" data-key="ArrowDown" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">&darr;</button>
+                    <button class="sp-key" data-key="ArrowRight" style="padding:12px; border-radius:8px; border:none; background:rgba(255,255,255,0.1); color:white;">&rarr;</button>
                 </div>
-                <div style="display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap;">
-                    ${[1,2,3,4,5,6,7,8,9,10,11,12].map(i => `<button class="sp-key" data-key="F${i}" style="padding: 10px; flex: 1 1 20%;">F${i}</button>`).join('')}
-                </div>
-                <button id="kb-show" style="width: 100%; padding: 15px; background: #4caf50; color: white; border: none; border-radius: 4px; font-weight: bold;">Open Phone Keyboard</button>
-                <input type="text" id="kb-input" style="opacity: 0; position: absolute; top: -1000px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
             </div>
         `;
         
@@ -42,8 +35,8 @@ export default {
         const updateModUI = (key) => {
             const btn = el.querySelector(`#kb-${key}`);
             const state = mods[key];
-            btn.style.backgroundColor = state === 2 ? '#f44336' : state === 1 ? '#ff9800' : '#444';
-            btn.style.color = state > 0 ? 'white' : '#ccc';
+            btn.style.backgroundColor = state === 2 ? 'var(--danger)' : state === 1 ? '#ff9f0a' : 'rgba(255,255,255,0.15)';
+            btn.style.color = state > 0 ? 'white' : 'var(--muted)';
         };
         
         ['ctrl', 'alt', 'shift', 'win'].forEach(k => {
@@ -80,30 +73,12 @@ export default {
             };
         });
         
-        const input = el.querySelector('#kb-input');
-        el.querySelector('#kb-show').onclick = () => {
-            input.focus();
-        };
-        
-        input.addEventListener('input', (e) => {
-            const char = e.data;
-            if (char) {
-                api.send('text', { text: char });
-                clearArmedMods();
-            }
-            input.value = '';
-        });
-        
-        input.addEventListener('keydown', (e) => {
-            if (e.key.length > 1) { // Special key
-                e.preventDefault();
-                api.send('key', { code: e.key, ...getModState(), action: 'press' });
-                clearArmedMods();
-            }
-        });
+        // Add footer and popup
+        this.cleanupUI = createUnifiedTouchpadAndKeyboard(this.el, this.api, true);
     },
     
     unmount() {
+        if (this.cleanupUI) this.cleanupUI();
         if (this.el) this.el.innerHTML = '';
     }
 };

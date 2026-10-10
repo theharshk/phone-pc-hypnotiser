@@ -3996,3 +3996,64 @@
 2026-10-10 18:42:57.434 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
 2026-10-10 18:42:57.435 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
 2026-10-10 18:42:57.436 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-10-10 18:55:51.121 [restartedMain] INFO  com.phoneremote.App - Starting App using Java 17.0.17 with PID 28520 (F:\phone pc hypnotiser\server\target\classes started by Harsh in F:\phone pc hypnotiser)
+2026-10-10 18:55:51.126 [restartedMain] INFO  com.phoneremote.App - No active profile set, falling back to 1 default profile: "default"
+2026-10-10 18:55:51.232 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-10-10 18:55:51.232 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-10-10 18:55:54.095 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-10-10 18:55:54.137 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-10 18:55:54.139 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-10-10 18:55:54.328 [restartedMain] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-10 18:55:54.330 [restartedMain] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 3096 ms
+2026-10-10 18:55:55.270 [restartedMain] INFO  c.phoneremote.admin.AdminController - Logging started
+2026-10-10 18:55:56.117 [restartedMain] INFO  o.s.b.d.a.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-10-10 18:55:56.190 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-10-10 18:55:56.210 [restartedMain] INFO  com.phoneremote.App - Started App in 6.237 seconds (process running for 7.353)
+2026-10-10 18:55:56.788 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-10-10 18:55:56.790 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-10-10 18:55:56.795 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 3 ms
+2026-10-10 19:40:58.998 [restartedMain] INFO  com.phoneremote.App - Starting App using Java 17.0.17 with PID 9992 (F:\phone pc hypnotiser\server\target\classes started by Harsh in F:\phone pc hypnotiser)
+2026-10-10 19:40:59.002 [restartedMain] INFO  com.phoneremote.App - No active profile set, falling back to 1 default profile: "default"
+2026-10-10 19:40:59.103 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-10-10 19:40:59.104 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-10-10 19:41:01.005 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-10-10 19:41:01.029 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-10 19:41:01.030 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-10-10 19:41:01.132 [restartedMain] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-10 19:41:01.132 [restartedMain] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 2027 ms
+2026-10-10 19:41:01.659 [restartedMain] INFO  c.phoneremote.admin.AdminController - Logging started
+2026-10-10 19:41:02.142 [restartedMain] INFO  o.s.b.d.a.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-10-10 19:41:02.197 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-10-10 19:41:02.211 [restartedMain] INFO  com.phoneremote.App - Started App in 4.416 seconds (process running for 5.391)
+2026-10-10 19:41:02.444 [http-nio-8080-exec-4] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-10-10 19:41:02.445 [http-nio-8080-exec-4] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-10-10 19:41:02.446 [http-nio-8080-exec-4] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-10-10 20:03:56.867 [restartedMain] INFO  com.phoneremote.App - Starting App using Java 17.0.17 with PID 24080 (F:\phone pc hypnotiser\server\target\classes started by Harsh in F:\phone pc hypnotiser)
+2026-10-10 20:03:56.871 [restartedMain] INFO  com.phoneremote.App - No active profile set, falling back to 1 default profile: "default"
+2026-10-10 20:03:56.979 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-10-10 20:03:56.979 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-10-10 20:03:59.445 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-10-10 20:03:59.489 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-10 20:03:59.490 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-10-10 20:03:59.638 [restartedMain] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-10 20:03:59.640 [restartedMain] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 2660 ms
+2026-10-10 20:04:00.442 [restartedMain] INFO  c.phoneremote.admin.AdminController - Logging started
+2026-10-10 20:04:01.303 [restartedMain] INFO  o.s.b.d.a.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-10-10 20:04:01.391 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-10-10 20:04:01.410 [restartedMain] INFO  com.phoneremote.App - Started App in 5.859 seconds (process running for 7.091)
+2026-10-10 20:04:01.549 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-10-10 20:04:01.551 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-10-10 20:04:01.553 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-10-10 20:05:14.024 [ScreenSnd-97fffd60-60c4-2b0d-5310-5459e367f192] ERROR com.phoneremote.module.ScreenModule - Send thread error
+java.lang.IllegalStateException: Message will not be sent because the WebSocket session has been closed
+	at org.apache.tomcat.websocket.WsRemoteEndpointImplBase.writeMessagePart(WsRemoteEndpointImplBase.java:450)
+	at org.apache.tomcat.websocket.WsRemoteEndpointImplBase.sendMessageBlock(WsRemoteEndpointImplBase.java:308)
+	at org.apache.tomcat.websocket.WsRemoteEndpointImplBase.sendMessageBlock(WsRemoteEndpointImplBase.java:257)
+	at org.apache.tomcat.websocket.WsRemoteEndpointImplBase.sendPartialBytes(WsRemoteEndpointImplBase.java:164)
+	at org.apache.tomcat.websocket.WsRemoteEndpointBasic.sendBinary(WsRemoteEndpointBasic.java:54)
+	at org.springframework.web.socket.adapter.standard.StandardWebSocketSession.sendBinaryMessage(StandardWebSocketSession.java:220)
+	at org.springframework.web.socket.adapter.AbstractWebSocketSession.sendMessage(AbstractWebSocketSession.java:111)
+	at com.phoneremote.ws.Session.sendBinary(Session.java:69)
+	at com.phoneremote.module.ScreenModule$StreamContext.lambda$start$2(ScreenModule.java:272)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+2026-10-10 20:20:05.899 [pool-20-thread-1] INFO  c.p.module.impl.PowerModule - Power action executed: LOCK at 2026-10-10T14:50:05.896450900Z by device: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36

@@ -18,6 +18,13 @@ let isEditMode = false;
 function updateStatus(state, text) {
     statusIndicator.className = state;
     statusText.textContent = text;
+    
+    const dot = document.getElementById('module-status-dot');
+    if (dot) {
+        if (state === 'connected') dot.style.background = '#32d74b'; // green
+        else if (state === 'reconnecting') dot.style.background = '#ffbd2e'; // yellow
+        else dot.style.background = '#ff453a'; // red
+    }
 }
 
 const authOverlay = document.createElement('div');
@@ -189,9 +196,19 @@ async function openModule(id) {
     title.textContent = availableModules.find(m => m.id === id)?.name || id;
     title.style.cssText = 'position:absolute; left:50%; transform:translateX(-50%); font-weight:600; font-size:1.1rem;';
     
+    const statusDot = document.createElement('div');
+    statusDot.id = 'module-status-dot';
+    statusDot.style.cssText = 'width:12px; height:12px; border-radius:50%; margin-left:auto; transition: background 0.3s;';
+    
     headerBar.appendChild(backBtn);
     headerBar.appendChild(title);
+    headerBar.appendChild(statusDot);
     activeModuleContainer.appendChild(headerBar);
+    
+    // Set initial color based on current statusIndicator
+    if (statusIndicator.className === 'connected') statusDot.style.background = '#32d74b';
+    else if (statusIndicator.className === 'reconnecting') statusDot.style.background = '#ffbd2e';
+    else statusDot.style.background = '#ff453a';
 
     const modContainer = document.createElement('div');
     modContainer.style.cssText = 'flex:1; width:100%; position:relative; overflow:auto;';
@@ -199,7 +216,7 @@ async function openModule(id) {
 
     try {
         if (!loadedModules[id]) {
-            const module = await import('./modules/' + id + '.js');
+            const module = await import('./modules/' + id + '.js?v=' + Date.now());
             loadedModules[id] = module.default;
         }
         
