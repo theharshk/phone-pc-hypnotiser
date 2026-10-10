@@ -22,7 +22,7 @@ export default {
         qualLbl.textContent = ' Qual: ';
         const qualIn = document.createElement('input');
         qualIn.type = 'number';
-        qualIn.min = 30; qualIn.max = 90; qualIn.value = 60;
+        qualIn.min = 30; qualIn.max = 90; qualIn.value = 80;
         qualIn.style.width = '45px';
         qualLbl.appendChild(qualIn);
         
@@ -30,7 +30,7 @@ export default {
         scaleLbl.textContent = ' Scale: ';
         const scaleIn = document.createElement('input');
         scaleIn.type = 'number';
-        scaleIn.min = 25; scaleIn.max = 100; scaleIn.value = 50;
+        scaleIn.min = 25; scaleIn.max = 100; scaleIn.value = 100;
         scaleIn.style.width = '45px';
         scaleLbl.appendChild(scaleIn);
         
@@ -75,15 +75,19 @@ export default {
         canvasWrapper.appendChild(img);
         
         const cursor = document.createElement('div');
-        cursor.style.width = '10px';
-        cursor.style.height = '10px';
-        cursor.style.background = 'red';
+        cursor.style.width = '2px';
+        cursor.style.height = '2px';
+        cursor.style.border = '2px solid white';
+        cursor.style.boxShadow = '0 0 3px rgba(0,0,0,0.8)';
+        cursor.style.background = 'transparent';
         cursor.style.borderRadius = '50%';
         cursor.style.position = 'absolute';
         cursor.style.pointerEvents = 'none';
         cursor.style.top = '0';
         cursor.style.left = '0';
         cursor.style.transform = 'translate(-50%, -50%)';
+        cursor.style.transition = 'opacity 0.3s ease';
+        cursor.style.opacity = '0';
         canvasWrapper.appendChild(cursor);
         
         fullscreenContainer.appendChild(canvasWrapper);
@@ -144,6 +148,20 @@ export default {
         };
         document.addEventListener('visibilitychange', handleVisibility);
 
+        let cursorTimeout = null;
+
+        const wakeCursor = () => {
+            cursor.style.opacity = '1';
+            if (cursorTimeout) clearTimeout(cursorTimeout);
+            cursorTimeout = setTimeout(() => {
+                cursor.style.opacity = '0';
+            }, 2500);
+        };
+
+        img.addEventListener('touchstart', wakeCursor, {passive: true});
+        img.addEventListener('mousemove', wakeCursor, {passive: true});
+        img.addEventListener('mousedown', wakeCursor, {passive: true});
+
         api.on = async (type, data) => {
             if (type === 'cursor') {
                 cursor.style.left = (data.x * 100) + '%';
@@ -185,6 +203,9 @@ export default {
             };
             ws.addEventListener('message', msgHandler);
         }
+
+        // Force send the default UI settings to the server immediately
+        setTimeout(() => applyBtn.click(), 100);
 
         this.cleanup = () => {
             document.removeEventListener('visibilitychange', handleVisibility);

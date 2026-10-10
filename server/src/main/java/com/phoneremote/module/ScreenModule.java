@@ -20,12 +20,17 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class ScreenModule implements RemoteModule {
+
+    private static final Logger logger = LoggerFactory.getLogger(ScreenModule.class);
+    public static final ScreenStats globalStats = new ScreenStats();
 
     private final ScreenAdapter screenAdapter;
     private final InputAdapter inputAdapter;
@@ -68,8 +73,8 @@ public class ScreenModule implements RemoteModule {
             // int seq = data.path("seq").asInt();
             ctx.unackedFrames.decrementAndGet();
         } else if ("settings".equals(type)) {
-            int q = data.path("quality").asInt(60);
-            int s = data.path("scale").asInt(50);
+            int q = data.path("quality").asInt(80);
+            int s = data.path("scale").asInt(100);
             int f = data.path("fps").asInt(5);
             ctx.quality = Math.max(30, Math.min(90, q));
             ctx.scale = Math.max(25, Math.min(100, s));
@@ -102,8 +107,8 @@ public class ScreenModule implements RemoteModule {
         Thread senderThread;
         Thread cursorThread;
 
-        int quality = 60;
-        int scale = 50;
+        int quality = 80;
+        int scale = 100;
         int fps = 5;
 
         int sequence = 0;
@@ -141,10 +146,13 @@ public class ScreenModule implements RemoteModule {
                                 if (img != null) {
                                     int targetW = Math.max(1, (img.getWidth() * scale) / 100);
                                     int targetH = Math.max(1, (img.getHeight() * scale) / 100);
+                                    
+                                    long scaleStart = System.currentTimeMillis();
                                     BufferedImage scaled = new BufferedImage(targetW, targetH, BufferedImage.TYPE_INT_RGB);
                                     Graphics2D g = scaled.createGraphics();
                                     g.drawImage(img, 0, 0, targetW, targetH, null);
                                     g.dispose();
+                                    long scaleEnd = System.currentTimeMillis();
 
                                     param.setCompressionQuality(quality / 100f);
                                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -155,8 +163,9 @@ public class ScreenModule implements RemoteModule {
                                     byte[] jpeg = baos.toByteArray();
 
                                     long encEnd = System.currentTimeMillis();
-                                    // Debug logging as per requirements
-                                    // System.out.println("Capture: " + (capEnd - capStart) + "ms, Encode: " + (encEnd - capEnd) + "ms, Size: " + jpeg.length);
+                                    
+                                    globalStats.addStat(capEnd - capStart, scaleEnd - scaleStart, encEnd - scaleEnd, jpeg.length / 1024, false);
+                                    logger.debug("Capture: {}ms, Scale: {}ms, Encode: {}ms, Size: {}KB", (capEnd - capStart), (scaleEnd - scaleStart), (encEnd - scaleEnd), jpeg.length / 1024);
 
                                     sequence = (sequence + 1) % 65536;
 
@@ -172,6 +181,8 @@ public class ScreenModule implements RemoteModule {
                                     frameQueue.offer(buf.array());
                                 }
                             }
+                        } else {
+                            globalStats.addStat(0, 0, 0, 0, true);
                         }
 
                         long sleepTime = targetTime - System.currentTimeMillis();

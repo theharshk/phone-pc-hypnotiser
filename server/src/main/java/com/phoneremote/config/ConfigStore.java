@@ -27,7 +27,7 @@ public class ConfigStore {
         public long created;
         public long lastSeen;
         public String lastIp;
-        public List<String> layout = new ArrayList<>(List.of("touchpad", "keyboard", "media", "power"));
+        public List<String> layout = new ArrayList<>(List.of("screen", "touchpad", "keyboard", "media", "power"));
         public java.util.Map<String, com.fasterxml.jackson.databind.JsonNode> settings = new java.util.HashMap<>();
     }
 

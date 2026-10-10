@@ -240,4 +240,120 @@ public class AdminController {
         lockoutTracker.clearAll();
         return "redirect:/admin";
     }
-}
+
+    @GetMapping("/logs")
+    @ResponseBody
+    public String logsPage(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!checkAccess(request, response)) return null;
+        HttpSession session = request.getSession(true);
+        if (session.getAttribute("csrf_token") == null) {
+            session.setAttribute("csrf_token", UUID.randomUUID().toString());
+        }
+        String csrf = (String) session.getAttribute("csrf_token");
+
+        StringBuilder html = new StringBuilder();
+        html.append("<html><head><title>Admin Logs</title>");
+        html.append("<style>body{font-family:sans-serif; padding: 20px;} .card{border:1px solid #ccc; padding:10px; margin-bottom:10px; border-radius:4px;} pre {white-space: pre-wrap; word-wrap: break-word; background: #f4f4f4; padding: 10px; border: 1px solid #ddd; max-height: 500px; overflow-y: auto;} .debug{color: gray;} .warn{color: orange;} .error{color: red;}</style>");
+        html.append("</head><body>");
+        html.append("<h1>System Logs</h1>");
+        html.append("<a href='/admin'>&larr; Back to Admin</a><br><br>");
+
+        com.phoneremote.module.ScreenStats.Averages stats = com.phoneremote.module.ScreenModule.globalStats.getAverages();
+        html.append("<div class='card'><h3>Screen Module Stats (Last 5s)</h3>");
+        html.append("<p>FPS: ").append(stats.fps).append(" | Skipped: ").append(stats.skippedFrames).append(" | Cap: ").append(stats.captureMs).append("ms | Scale: ").append(stats.scaleMs).append("ms | Enc: ").append(stats.encodeMs).append("ms | Size: ").append(stats.frameSizeKB).append("KB</p>");
+        html.append("</div>");
+
+        html.append("<div class='card'><h3>Controls</h3>");
+        html.append("<form method='post' action='/admin/logs/level' style='display:inline;'>")
+            .append("<input type='hidden' name='csrf' value='").append(csrf).append("'>")
+            .append("<button type='submit'>Toggle DEBUG/INFO Level</button></form> ");
+        html.append("<a href='/admin/logs/download' target='_blank'><button>Download File</button></a>");
+        html.append("</div>");
+
+        html.append("<div class='card'><h3>Live Logs</h3>");
+        html.append("<p>Filter: <select id='lvlFilter'><option value=''>ALL</option><option value='DEBUG'>DEBUG</option><option value='INFO'>INFO</option><option value='WARN'>WARN</option><option value='ERROR'>ERROR</option></select> ");
+        html.append("Search: <input type='text' id='searchBox'> ");
+        html.append("<button onclick='fetchLogs()'>Refresh</button> ");
+        html.append("<label><input type='checkbox' id='autoRefresh' checked> Auto-refresh (3s)</label></p>");
+        html.append("<pre id='logOutput'></pre>");
+        html.append("</div>");
+
+        html.append("<script>");
+        html.append("let lastTime = 0;");
+        html.append("function fetchLogs() {");
+        html.append("  let lvl = document.getElementById('lvlFilter').value;");
+        html.append("  let q = encodeURIComponent(document.getElementById('searchBox').value);");
+        html.append("  fetch(`/admin/api/logs?level=${lvl}&search=${q}`).then(r => r.json()).then(data => {");
+        html.append("    let out = '';");
+        html.append("    data.logs.forEach(l => {");
+        html.append("      let cls = '';");
+        html.append("      if(l.level==='DEBUG') cls='debug';");
+        html.append("      if(l.level==='WARN') cls='warn';");
+        html.append("      if(l.level==='ERROR') cls='error';");
+        html.append("      out += `<span class='${cls}'>${l.formatted}</span>\\n`;");
+        html.append("    });");
+        html.append("    document.getElementById('logOutput').innerHTML = out;");
+        html.append("  });");
+        html.append("}");
+        html.append("setInterval(() => { if(document.getElementById('autoRefresh').checked) fetchLogs(); }, 3000);");
+        html.append("fetchLogs();");
+        html.append("</script>");
+
+        html.append("</body></html>");
+        return html.toString();
+    }
+
+    @PostMapping("/logs/level")
+    public String toggleLogLevel(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!checkAccess(request, response)) return null;
+        if (!verifyCsrfAndOrigin(request)) { response.sendError(400, "Invalid CSRF/Origin"); return null; }
+
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("com.phoneremote");
+        if (root.getLevel() == ch.qos.logback.classic.Level.DEBUG) {
+            root.setLevel(ch.qos.logback.classic.Level.INFO);
+        } else {
+            root.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        }
+        return "redirect:/admin/logs";
+    }
+
+    @GetMapping(value = "/api/logs", produces = "application/json")
+    @ResponseBody
+    public String apiLogs(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!checkAccess(request, response)) return null;
+        String level = request.getParameter("level");
+        String search = request.getParameter("search");
+        
+        java.util.List<ch.qos.logback.classic.spi.ILoggingEvent> events = com.phoneremote.logging.InMemoryLogAppender.getEvents();
+        int max = Math.min(200, events.size());
+        events = events.subList(events.size() - max, events.size());
+
+        com.fasterxml.jackson.databind.node.ArrayNode arr = new com.fasterxml.jackson.databind.ObjectMapper().createArrayNode();
+        for (ch.qos.logback.classic.spi.ILoggingEvent e : events) {
+            if (level != null && !level.isEmpty() && !e.getLevel().toString().equals(level)) continue;
+            String formatted = e.getFormattedMessage();
+            if (search != null && !search.isEmpty() && !formatted.toLowerCase().contains(search.toLowerCase())) continue;
+            
+            com.fasterxml.jackson.databind.node.ObjectNode node = arr.addObject();
+            node.put("level", e.getLevel().toString());
+            node.put("formatted", escapeHtml(java.time.Instant.ofEpochMilli(e.getTimeStamp()).toString() + " [" + e.getThreadName() + "] " + e.getLevel() + " " + e.getLoggerName() + " - " + formatted));
+        }
+        
+        com.fasterxml.jackson.databind.node.ObjectNode res = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        res.set("logs", arr);
+        return res.toString();
+    }
+
+    @GetMapping("/logs/download")
+    public void downloadLogs(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!checkAccess(request, response)) return;
+        java.io.File logFile = new java.io.File("logs/phoneremote.log");
+        if (!logFile.exists()) {
+            response.sendError(404, "Log file not found");
+            return;
+        }
+        response.setContentType("text/plain");
+        response.setHeader("Content-Disposition", "attachment; filename=\"phoneremote.log\"");
+        java.nio.file.Files.copy(logFile.toPath(), response.getOutputStream());
+        response.getOutputStream().flush();
+    }}

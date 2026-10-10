@@ -53,7 +53,7 @@ class LayoutTests {
 
         ConfigStore.DeviceInfo loaded = configStore.getDevice("dev1");
         assertNotNull(loaded);
-        assertEquals(List.of("touchpad", "keyboard", "media", "power"), loaded.layout);
+        assertEquals(List.of("screen", "touchpad", "keyboard", "media", "power"), loaded.layout);
     }
 
     @Test

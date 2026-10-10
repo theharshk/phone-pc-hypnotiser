@@ -52,8 +52,8 @@ class ScreenTests {
         assertEquals(0, buf.get()); // monitor
         int w = buf.getShort() & 0xFFFF;
         int h = buf.getShort() & 0xFFFF;
-        assertEquals(1920 * 50 / 100, w); // scale 50
-        assertEquals(1080 * 50 / 100, h);
+        assertEquals(1920, w); // scale 100
+        assertEquals(1080, h);
 
         module.onClose(session);
     }
