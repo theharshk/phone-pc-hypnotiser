@@ -1,0 +1,30 @@
+body {
+    font-family: sans-serif;
+    background-color: #121212;
+    color: white;
+    margin: 0;
+    padding: 0;
+}
+
+#status-bar {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: #1e1e1e;
+    border-bottom: 1px solid #333;
+}
+
+#status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.connected { background-color: #4caf50; }
+.reconnecting { background-color: #ff9800; }
+.disconnected { background-color: #f44336; }
+
+#main-content {
+    padding: 20px;
+}
