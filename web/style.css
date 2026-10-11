@@ -213,8 +213,8 @@ h1, h2, h3, h4, .heading {
     color: var(--muted);
     font-family: 'Instrument Sans', sans-serif;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    min-width: 0;
 }
 
 .status-dot {
@@ -223,23 +223,30 @@ h1, h2, h3, h4, .heading {
     min-width: 9px;
     border-radius: 50%;
     display: inline-block;
+    flex-shrink: 0;
+    margin: 2px 2px 2px 3px;
     transition: background-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .status-dot.connected {
     background: var(--success);
-    box-shadow: 0 0 6px var(--success);
+    box-shadow: 0 0 0 2px rgba(61, 220, 151, 0.25), 0 0 8px var(--success);
+}
+
+[data-theme="light"] .status-dot.connected {
+    background: #10B981;
+    box-shadow: 0 0 0 2.5px rgba(16, 185, 129, 0.25), 0 0 9px rgba(16, 185, 129, 0.7);
 }
 
 .status-dot.reconnecting {
     background: var(--warning);
-    box-shadow: 0 0 6px var(--warning);
+    box-shadow: 0 0 0 2px rgba(255, 176, 32, 0.25), 0 0 8px var(--warning);
     animation: status-pulse 1.6s infinite ease-in-out;
 }
 
 .status-dot.disconnected {
     background: var(--danger);
-    box-shadow: 0 0 6px var(--danger);
+    box-shadow: 0 0 0 2px rgba(255, 92, 102, 0.2), 0 0 6px var(--danger);
 }
 
 @keyframes status-pulse {
@@ -251,6 +258,7 @@ h1, h2, h3, h4, .heading {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .header-actions {
