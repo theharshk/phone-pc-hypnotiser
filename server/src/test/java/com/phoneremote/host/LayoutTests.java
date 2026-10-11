@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.phoneremote.config.ConfigStore;
 import com.phoneremote.module.ModuleRegistry;
 import com.phoneremote.terminal.TerminalPromptService;
-import com.phoneremote.admin.PendingApprovalStore;
 import com.phoneremote.ws.LockoutTracker;
 import com.phoneremote.ws.RemoteSocketHandler;
 import com.phoneremote.ws.Session;
@@ -31,18 +30,18 @@ class LayoutTests {
     void setUp() throws Exception {
         System.setProperty("user.dir", Files.createTempDirectory("phoneremotetest").toString());
         configStore = new ConfigStore();
-        registry = new ModuleRegistry();
         
         // Dummy module
-        registry.register(new com.phoneremote.module.RemoteModule() {
+        com.phoneremote.module.RemoteModule dummyModule = new com.phoneremote.module.RemoteModule() {
             @Override public String id() { return "test_module"; }
             @Override public String displayName() { return "Test"; }
             @Override public void onMessage(Session s, String t, com.fasterxml.jackson.databind.JsonNode d) {}
             @Override public void onOpen(Session s) {}
             @Override public void onClose(Session s) {}
-        });
+        };
+        registry = new ModuleRegistry(List.of(dummyModule));
 
-        handler = new RemoteSocketHandler(registry, configStore, new LockoutTracker(), mock(TerminalPromptService.class), new PendingApprovalStore());
+        handler = new RemoteSocketHandler(registry, configStore, new LockoutTracker(), mock(TerminalPromptService.class));
     }
 
     @Test

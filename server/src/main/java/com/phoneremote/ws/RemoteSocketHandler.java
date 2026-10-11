@@ -32,11 +32,30 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
     private final TerminalPromptService promptService;
 
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<String, java.util.Set<Session>> deviceSessions = new ConcurrentHashMap<>();
     private final Timer authTimer = new Timer(true);
     private static final int MAX_PAYLOAD_LENGTH = 8192;
 
     public int getActiveSessionCount() {
         return (int) sessions.values().stream().filter(Session::isAuthenticated).count();
+    }
+
+    private void registerDeviceSession(String deviceId, Session session) {
+        if (deviceId != null && !deviceId.isEmpty()) {
+            deviceSessions.computeIfAbsent(deviceId, k -> ConcurrentHashMap.newKeySet()).add(session);
+        }
+    }
+
+    private void unregisterDeviceSession(String deviceId, Session session) {
+        if (deviceId != null) {
+            java.util.Set<Session> set = deviceSessions.get(deviceId);
+            if (set != null) {
+                set.remove(session);
+                if (set.isEmpty()) {
+                    deviceSessions.remove(deviceId, set);
+                }
+            }
+        }
     }
 
     public RemoteSocketHandler(ModuleRegistry moduleRegistry, ConfigStore configStore, LockoutTracker lockoutTracker, TerminalPromptService promptService) {
@@ -115,6 +134,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                 if (configStore.verifyDeviceToken(deviceId, token, ip)) {
                     session.setAuthenticated(true);
                     session.setDeviceId(deviceId);
+                    registerDeviceSession(deviceId, session);
                     sendReady(session);
                 } else {
                     sendError(session, "revoked");
@@ -160,6 +180,13 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             }
 
         } else if ("ping".equals(t)) {
+            if (session.isAuthenticated()) {
+                String devId = session.getDeviceId();
+                if (devId == null || configStore.getDevice(devId) == null) {
+                    revokeSession(session);
+                    return;
+                }
+            }
             ObjectNode response = mapper.createObjectNode();
             response.put("m", "core");
             response.put("t", "pong");
@@ -234,6 +261,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
 
         session.setAuthenticated(true);
         session.setDeviceId(deviceId);
+        registerDeviceSession(deviceId, session);
 
         try {
             ObjectNode response = mapper.createObjectNode();
@@ -254,9 +282,48 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             response.put("t", "error");
             ObjectNode data = mapper.createObjectNode();
             data.put("type", errType);
+            data.put("code", errType);
             response.set("d", data);
             session.send(mapper.writeValueAsString(response));
         } catch (Exception e) {}
+    }
+
+    public void revokeSession(Session session) {
+        if (session == null) return;
+        String deviceId = session.getDeviceId();
+        unregisterDeviceSession(deviceId, session);
+        sendError(session, "revoked");
+        for (RemoteModule module : moduleRegistry.getAll()) {
+            try {
+                module.onClose(session);
+            } catch (Exception e) {
+                System.err.println("Module error on revoke: " + e.getMessage());
+            }
+        }
+        session.setAuthenticated(false);
+        session.setDeviceId(null);
+        session.close();
+    }
+
+    public void revokeDevice(String deviceId) {
+        if (deviceId == null) return;
+        java.util.Set<Session> devSessions = deviceSessions.remove(deviceId);
+        if (devSessions != null) {
+            for (Session session : devSessions) {
+                revokeSession(session);
+            }
+        }
+    }
+
+    public void revokeAllDevices() {
+        java.util.List<Session> all = new java.util.ArrayList<>();
+        for (java.util.Set<Session> set : deviceSessions.values()) {
+            all.addAll(set);
+        }
+        deviceSessions.clear();
+        for (Session s : all) {
+            revokeSession(s);
+        }
     }
 
     private void sendReady(Session session) throws Exception {
@@ -292,6 +359,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession wsSession, CloseStatus status) throws Exception {
         Session session = sessions.remove(wsSession.getId());
         if (session != null) {
+            unregisterDeviceSession(session.getDeviceId(), session);
             if (session.isAuthenticated()) {
                 for (RemoteModule module : moduleRegistry.getAll()) {
                     module.onClose(session);

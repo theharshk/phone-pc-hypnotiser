@@ -14,6 +14,7 @@ let loadedModules = {};
 let availableModules = [];
 let currentLayout = [];
 let isEditMode = false;
+let isRevoked = false;
 
 function updateStatus(state, text) {
     statusIndicator.className = state;
@@ -321,11 +322,19 @@ function connect() {
                 } else if (msg.d.type === 'locked_out') {
                     showAuthOverlay(`<svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:20px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                         <h2 style="font-size:2rem; font-weight:700; color:var(--danger); margin-bottom:12px;">Locked Out</h2><p style="color:var(--muted); font-size:1.1rem;">Too many attempts. Try again later.</p>`);
-                } else if (msg.d.type === 'revoked') {
+                } else if (msg.d && (msg.d.type === 'revoked' || msg.d.code === 'revoked')) {
+                    isRevoked = true;
+                    cleanup();
+                    if (activeModule) {
+                        closeActiveModule();
+                    }
                     localStorage.removeItem('pr_token');
                     localStorage.removeItem('pr_device_id');
                     showAuthOverlay(`<svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:20px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
                         <h2 style="font-size:2rem; font-weight:700; margin-bottom:12px;">Device Revoked</h2><p style="color:var(--muted); font-size:1.1rem;">Please refresh the page to pair again.</p>`);
+                    if (ws) {
+                        try { ws.close(); } catch (e) {}
+                    }
                 }
             } else if (msg.t === 'ready') {
                 hideAuthOverlay();
@@ -392,6 +401,7 @@ function cleanup() {
 }
 
 function scheduleReconnect() {
+    if (isRevoked) return;
     updateStatus('disconnected', `Reconnecting in ${currentDelay}ms...`);
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connect, currentDelay);

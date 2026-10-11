@@ -150,10 +150,12 @@ public class AdminController {
         String action = request.getParameter("action");
         if ("all".equals(action)) {
             configStore.removeAllDevices();
+            socketHandler.revokeAllDevices();
         } else {
             String deviceId = request.getParameter("deviceId");
             if (deviceId != null) {
                 configStore.removeDevice(deviceId);
+                socketHandler.revokeDevice(deviceId);
             }
         }
         return "redirect:/admin";

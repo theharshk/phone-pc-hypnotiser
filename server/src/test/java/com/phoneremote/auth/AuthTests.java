@@ -2,7 +2,6 @@ package com.phoneremote.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.phoneremote.admin.PendingApprovalStore;
 import com.phoneremote.config.ConfigStore;
 import com.phoneremote.module.ModuleRegistry;
 import com.phoneremote.terminal.TerminalPromptService;
@@ -17,6 +16,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -95,9 +95,8 @@ class AuthTests {
     @Test
     void testRejectPreAuthMessages() throws Exception {
         TerminalPromptService promptService = mock(TerminalPromptService.class);
-        PendingApprovalStore pendingApprovalStore = new PendingApprovalStore();
-        ModuleRegistry registry = new ModuleRegistry();
-        RemoteSocketHandler handler = new RemoteSocketHandler(registry, configStore, lockoutTracker, promptService, pendingApprovalStore);
+        ModuleRegistry registry = new ModuleRegistry(java.util.Collections.emptyList());
+        RemoteSocketHandler handler = new RemoteSocketHandler(registry, configStore, lockoutTracker, promptService);
 
         WebSocketSession ws = mock(WebSocketSession.class);
         when(ws.getId()).thenReturn("ws-1");
@@ -119,5 +118,140 @@ class AuthTests {
         
         // Assert ws.sendMessage was not called (except possibly ping/pong which we didn't send)
         verify(ws, never()).sendMessage(any());
+    }
+
+    @Test
+    void testSessionRevokedSendsMessageClosesAndCallsModulesOnClose() throws Exception {
+        String deviceId = "dev-revoked-1";
+        String tokenRaw = "token_abc";
+        ConfigStore.DeviceInfo info = new ConfigStore.DeviceInfo();
+        info.deviceId = deviceId;
+        info.tokenHash = configStore.hashToken(tokenRaw);
+        configStore.addDevice(info);
+
+        com.phoneremote.module.RemoteModule mockModule = mock(com.phoneremote.module.RemoteModule.class);
+        when(mockModule.id()).thenReturn("test_mod");
+        when(mockModule.displayName()).thenReturn("Test Mod");
+        ModuleRegistry registry = new ModuleRegistry(List.of(mockModule));
+
+        TerminalPromptService promptService = mock(TerminalPromptService.class);
+        RemoteSocketHandler handler = new RemoteSocketHandler(registry, configStore, lockoutTracker, promptService);
+
+        WebSocketSession ws = mock(WebSocketSession.class);
+        when(ws.getId()).thenReturn("ws-revoked");
+        when(ws.isOpen()).thenReturn(true);
+        handler.afterConnectionEstablished(ws);
+
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode helloMsg = mapper.createObjectNode();
+        helloMsg.put("m", "core");
+        helloMsg.put("t", "hello");
+        ObjectNode helloData = mapper.createObjectNode();
+        helloData.put("deviceId", deviceId);
+        helloData.put("token", tokenRaw);
+        helloData.put("deviceName", "Test Device");
+        helloMsg.set("d", helloData);
+
+        handler.handleMessage(ws, new TextMessage(mapper.writeValueAsString(helloMsg)));
+
+        // Verify connected and authenticated
+        assertEquals(1, handler.getActiveSessionCount());
+
+        // Revoke the device
+        configStore.removeDevice(deviceId);
+        handler.revokeDevice(deviceId);
+
+        // Verify session receives error message with revoked
+        org.mockito.ArgumentCaptor<TextMessage> textCaptor = org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+        verify(ws, atLeastOnce()).sendMessage(textCaptor.capture());
+        boolean foundRevoked = false;
+        for (TextMessage tm : textCaptor.getAllValues()) {
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(tm.getPayload());
+            if ("core".equals(node.path("m").asText()) && "error".equals(node.path("t").asText())) {
+                if ("revoked".equals(node.path("d").path("code").asText()) || "revoked".equals(node.path("d").path("type").asText())) {
+                    foundRevoked = true;
+                    break;
+                }
+            }
+        }
+        assertTrue(foundRevoked, "Expected revoked error message sent to WebSocket");
+
+        // Verify mockModule onClose was called
+        verify(mockModule, times(1)).onClose(any(Session.class));
+
+        // Verify active session count dropped to 0
+        assertEquals(0, handler.getActiveSessionCount());
+
+        // Verify ws was closed
+        verify(ws, times(1)).close();
+
+        // Verify revoked token is now rejected on new hello
+        WebSocketSession wsNew = mock(WebSocketSession.class);
+        when(wsNew.getId()).thenReturn("ws-new");
+        when(wsNew.isOpen()).thenReturn(true);
+        handler.afterConnectionEstablished(wsNew);
+        handler.handleMessage(wsNew, new TextMessage(mapper.writeValueAsString(helloMsg)));
+
+        org.mockito.ArgumentCaptor<TextMessage> newTextCaptor = org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+        verify(wsNew, atLeastOnce()).sendMessage(newTextCaptor.capture());
+        boolean newRejected = false;
+        for (TextMessage tm : newTextCaptor.getAllValues()) {
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(tm.getPayload());
+            if ("core".equals(node.path("m").asText()) && "error".equals(node.path("t").asText())
+                    && ("revoked".equals(node.path("d").path("code").asText()) || "revoked".equals(node.path("d").path("type").asText()))) {
+                newRejected = true;
+                break;
+            }
+        }
+        assertTrue(newRejected, "Expected rejected error message on hello for revoked token");
+        assertEquals(0, handler.getActiveSessionCount());
+    }
+
+    @Test
+    void testPingSafetyNetDetectsRevocation() throws Exception {
+        String deviceId = "dev-ping-safety";
+        String tokenRaw = "token_xyz";
+        ConfigStore.DeviceInfo info = new ConfigStore.DeviceInfo();
+        info.deviceId = deviceId;
+        info.tokenHash = configStore.hashToken(tokenRaw);
+        configStore.addDevice(info);
+
+        com.phoneremote.module.RemoteModule mockModule = mock(com.phoneremote.module.RemoteModule.class);
+        when(mockModule.id()).thenReturn("test_mod2");
+        when(mockModule.displayName()).thenReturn("Test Mod 2");
+        ModuleRegistry registry = new ModuleRegistry(List.of(mockModule));
+
+        RemoteSocketHandler handler = new RemoteSocketHandler(registry, configStore, lockoutTracker, mock(TerminalPromptService.class));
+        WebSocketSession ws = mock(WebSocketSession.class);
+        when(ws.getId()).thenReturn("ws-ping");
+        when(ws.isOpen()).thenReturn(true);
+        handler.afterConnectionEstablished(ws);
+
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode helloMsg = mapper.createObjectNode();
+        helloMsg.put("m", "core");
+        helloMsg.put("t", "hello");
+        ObjectNode helloData = mapper.createObjectNode();
+        helloData.put("deviceId", deviceId);
+        helloData.put("token", tokenRaw);
+        helloMsg.set("d", helloData);
+        handler.handleMessage(ws, new TextMessage(mapper.writeValueAsString(helloMsg)));
+
+        assertEquals(1, handler.getActiveSessionCount());
+
+        // Device record removed behind the scenes without direct socketHandler.revokeDevice
+        configStore.removeDevice(deviceId);
+
+        // Ping arrives
+        ObjectNode pingMsg = mapper.createObjectNode();
+        pingMsg.put("m", "core");
+        pingMsg.put("t", "ping");
+        pingMsg.put("i", 12345);
+        handler.handleMessage(ws, new TextMessage(mapper.writeValueAsString(pingMsg)));
+
+        // Safety net should have revoked the session
+        assertEquals(0, handler.getActiveSessionCount());
+        verify(mockModule, times(1)).onClose(any(Session.class));
+        verify(ws, times(1)).close();
     }
 }
