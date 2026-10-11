@@ -76,6 +76,12 @@ public class KeyboardModule implements RemoteModule {
             String action = data.path("action").asText("press");
 
             Integer vk = SPECIAL_KEYS.get(codeStr);
+            if (vk == null && codeStr != null && codeStr.length() == 1) {
+                char c = Character.toUpperCase(codeStr.charAt(0));
+                if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ') {
+                    vk = (int) c;
+                }
+            }
             if (vk == null) return;
 
             if ("press".equals(action) || "down".equals(action)) {

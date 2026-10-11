@@ -1,7 +1,16 @@
-const statusIndicator = document.getElementById('status-indicator');
+// web/host.js - Phone Remote Controller Client
+// Aligned with DESIGN.md Section 6.5 & Section 21
+
+// UI Elements
+const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
-const moduleContainer = document.getElementById('module-container');
+const deviceTitle = document.getElementById('device-title');
+const homeView = document.getElementById('home-view');
+const settingsView = document.getElementById('settings-view');
 const activeModuleContainer = document.getElementById('active-module');
+const moonBtn = document.getElementById('moon-btn');
+const editBtn = document.getElementById('edit-btn');
+const settingsBtn = document.getElementById('settings-btn');
 
 let ws = null;
 let reconnectTimer = null;
@@ -15,22 +24,123 @@ let availableModules = [];
 let currentLayout = [];
 let isEditMode = false;
 let isRevoked = false;
+let isAuthenticated = false;
 
-function updateStatus(state, text) {
-    statusIndicator.className = state;
-    statusText.textContent = text;
-    
-    const dot = document.getElementById('module-status-dot');
-    if (dot) {
-        if (state === 'connected') dot.style.background = '#32d74b'; // green
-        else if (state === 'reconnecting') dot.style.background = '#ffbd2e'; // yellow
-        else dot.style.background = '#ff453a'; // red
+// --------------------------------------------------------------------------
+// Safe LocalStorage Helper
+// --------------------------------------------------------------------------
+function safeStorageGet(key, fallback = null) {
+    try {
+        const val = localStorage.getItem(key);
+        return val !== null ? val : fallback;
+    } catch (e) {
+        return fallback;
     }
 }
 
+function safeStorageSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {}
+}
+
+function safeStorageRemove(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {}
+}
+
+// --------------------------------------------------------------------------
+// Settings State & Haptics
+// --------------------------------------------------------------------------
+let userTheme = safeStorageGet('pr_theme', 'dark');
+let isBedside = safeStorageGet('pr_bedside', 'false') === 'true';
+let hapticsEnabled = safeStorageGet('pr_haptics', 'true') === 'true';
+let touchpadSpeed = parseFloat(safeStorageGet('pr_touchpad_speed', '1.0')) || 1.0;
+
+function triggerHaptic(duration = 35) {
+    if (!hapticsEnabled) return;
+    try {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(duration);
+        }
+    } catch (e) {}
+}
+if (typeof window !== 'undefined') {
+    window.__pr_triggerHaptic = triggerHaptic;
+}
+
+function updateThemeIcon(effective) {
+    if (!moonBtn) return;
+    if (effective === 'light') {
+        moonBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+        moonBtn.setAttribute('aria-label', 'Switch to dark theme');
+        moonBtn.setAttribute('title', 'Switch to dark theme');
+    } else {
+        moonBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+        moonBtn.setAttribute('aria-label', 'Switch to light theme');
+        moonBtn.setAttribute('title', 'Switch to light theme');
+    }
+}
+
+function applyTheme(themeChoice) {
+    userTheme = themeChoice;
+    safeStorageSet('pr_theme', userTheme);
+    let effective = userTheme;
+    if (userTheme === 'system') {
+        effective = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', effective);
+    updateThemeIcon(effective);
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+        metaTheme.setAttribute('content', effective === 'light' ? '#E8EBF0' : '#05070B');
+    }
+}
+
+function applyBedside(enable) {
+    isBedside = enable;
+    safeStorageSet('pr_bedside', isBedside ? 'true' : 'false');
+    if (isBedside) {
+        document.documentElement.setAttribute('data-bedside', 'true');
+    } else {
+        document.documentElement.removeAttribute('data-bedside');
+    }
+}
+
+// Apply initial settings
+applyTheme(userTheme);
+applyBedside(isBedside);
+
+if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+        if (userTheme === 'system') applyTheme('system');
+    });
+}
+
+// --------------------------------------------------------------------------
+// Status Line & Indicators
+// --------------------------------------------------------------------------
+function updateStatus(state, text) {
+    if (statusDot) {
+        statusDot.className = 'status-dot ' + state;
+    }
+    if (statusText) {
+        statusText.textContent = text;
+    }
+    const dot = document.getElementById('module-status-dot');
+    if (dot) {
+        dot.className = 'status-dot ' + state;
+    }
+}
+
+// --------------------------------------------------------------------------
+// Auth & Locked/Revoked Overlays
+// --------------------------------------------------------------------------
 const authOverlay = document.createElement('div');
 authOverlay.id = 'auth-overlay';
-authOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#222;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;text-align:center;display:none;';
+authOverlay.className = 'glass-overlay';
+authOverlay.style.display = 'none';
 document.body.appendChild(authOverlay);
 
 function showAuthOverlay(html) {
@@ -42,174 +152,605 @@ function hideAuthOverlay() {
     authOverlay.style.display = 'none';
 }
 
-function renderHomeScreen() {
-    moduleContainer.innerHTML = '';
-    moduleContainer.style.display = 'block';
-    activeModuleContainer.style.display = 'none';
+function showConfirmDialog({ title, message, confirmText, isDanger = false, onConfirm }) {
+    triggerHaptic(20);
+    const dangerStyle = isDanger ? 'style="background:var(--danger); color:#FFFFFF;"' : '';
+    showAuthOverlay(`
+        <div class="auth-card" style="max-width:320px;">
+            <h3 class="heading" style="font-size:clamp(20px, 5.5vw, 24px); margin-bottom:8px;">${title}</h3>
+            <p style="color:var(--muted); font-size:clamp(13px, 3.5vw, 15px); margin-bottom:20px;">${message}</p>
+            <div style="width:100%; display:flex; flex-direction:column; gap:10px;">
+                <button id="modal-confirm-btn" class="pill-btn-primary" ${dangerStyle}>${confirmText}</button>
+                <button id="modal-cancel-btn" class="pill-btn-outline" style="width:100%;">Cancel</button>
+            </div>
+        </div>
+    `);
 
-    // Header controls
-    const header = document.createElement('div');
-    header.style.display = 'flex';
-    header.style.justifyContent = 'space-between';
-    header.style.alignItems = 'center';
-    header.style.marginBottom = '24px';
-    
-    const title = document.createElement('h2');
-    title.textContent = 'Modules';
-    title.style.margin = '0';
-    title.style.fontSize = '1.3rem';
-    header.appendChild(title);
-    
-    const editBtn = document.createElement('button');
-    editBtn.textContent = isEditMode ? 'Done' : 'Edit';
-    editBtn.style.cssText = 'background:rgba(255,255,255,0.1); color:var(--accent); font-weight:600; padding:8px 16px; border-radius:20px; font-size:0.95rem;';
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    if (confirmBtn) {
+        confirmBtn.onclick = () => {
+            triggerHaptic(25);
+            hideAuthOverlay();
+            if (typeof onConfirm === 'function') onConfirm();
+        };
+    }
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            triggerHaptic(15);
+            hideAuthOverlay();
+        };
+    }
+}
+
+// --------------------------------------------------------------------------
+// Router (Section 6.5)
+// --------------------------------------------------------------------------
+window.addEventListener('hashchange', () => {
+    const route = window.location.hash.replace(/^#/, '');
+    renderRoute(route);
+});
+
+function renderRoute(route) {
+    // If not authenticated, overlay is active. Still sync views underneath.
+    if (!route || route === 'home') {
+        if (activeModule) {
+            activeModule.unmount();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
+            }
+            activeModule = null;
+            activeModuleId = null;
+        }
+        homeView.style.display = 'block';
+        settingsView.style.display = 'none';
+        activeModuleContainer.style.display = 'none';
+        activeModuleContainer.innerHTML = '';
+        renderHomeScreen();
+    } else if (route === 'settings') {
+        if (activeModule) {
+            activeModule.unmount();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
+            }
+            activeModule = null;
+            activeModuleId = null;
+        }
+        homeView.style.display = 'none';
+        settingsView.style.display = 'block';
+        activeModuleContainer.style.display = 'none';
+        activeModuleContainer.innerHTML = '';
+        renderSettingsScreen();
+    } else {
+        // Module route
+        homeView.style.display = 'none';
+        settingsView.style.display = 'none';
+        activeModuleContainer.style.display = 'flex';
+        openModule(route);
+    }
+}
+
+// --------------------------------------------------------------------------
+// Header Action Listeners
+// --------------------------------------------------------------------------
+if (moonBtn) {
+    moonBtn.onclick = () => {
+        triggerHaptic(30);
+        const currentEffective = document.documentElement.getAttribute('data-theme') || userTheme;
+        const nextTheme = currentEffective === 'dark' ? 'light' : 'dark';
+        applyTheme(nextTheme);
+        const segBtns = document.querySelectorAll('.seg-btn');
+        if (segBtns.length > 0) {
+            segBtns.forEach(b => {
+                if (b.dataset.val === nextTheme) b.classList.add('active');
+                else b.classList.remove('active');
+            });
+        }
+    };
+}
+
+if (editBtn) {
     editBtn.onclick = () => {
+        triggerHaptic(10);
         isEditMode = !isEditMode;
+        editBtn.textContent = isEditMode ? 'Done' : 'Edit';
         if (isEditMode) document.body.classList.add('edit-mode');
         else document.body.classList.remove('edit-mode');
         renderHomeScreen();
     };
-    header.appendChild(editBtn);
-    moduleContainer.appendChild(header);
+}
 
+if (settingsBtn) {
+    settingsBtn.onclick = () => {
+        triggerHaptic(10);
+        window.location.hash = '#settings';
+    };
+}
+
+// --------------------------------------------------------------------------
+// Module Icons (Clean Inline SVGs, accent-text color)
+// --------------------------------------------------------------------------
+const moduleIcons = {
+    'touchpad': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><line x1="4" y1="12" x2="20" y2="12"></line><line x1="12" y1="12" x2="12" y2="20"></line></svg>`,
+    'keyboard': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"></path></svg>`,
+    'media': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
+    'power': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>`,
+    'screen': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>`
+};
+
+const moduleDescriptions = {
+    'touchpad': 'Cursor, clicks & gestures',
+    'keyboard': 'Typing & special keys',
+    'media': 'Volume & playback controls',
+    'power': 'Sleep, restart & shutdown',
+    'screen': 'Live desktop view & taps'
+};
+
+// --------------------------------------------------------------------------
+// Quick Actions (Mute, Lock, Sleep)
+// --------------------------------------------------------------------------
+function executeQuickMute() {
+    triggerHaptic(15);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({m: 'media', t: 'action', d: {key: 'MUTE'}}));
+    }
+}
+
+function executeQuickLock() {
+    triggerHaptic(15);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const handler = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.m === 'power' && msg.t === 'token' && msg.d && msg.d.action === 'LOCK') {
+                    ws.removeEventListener('message', handler);
+                    ws.send(JSON.stringify({m: 'power', t: 'execute', d: {action: 'LOCK', token: msg.d.token}}));
+                }
+            } catch (e) {}
+        };
+        ws.addEventListener('message', handler);
+        ws.send(JSON.stringify({m: 'power', t: 'request', d: {action: 'LOCK'}}));
+    }
+}
+
+function executeQuickSleep() {
+    triggerHaptic(15);
+    // Request token and execute confirmation flow
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        const handler = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.m === 'power' && msg.t === 'token' && msg.d && msg.d.action === 'SLEEP') {
+                    ws.removeEventListener('message', handler);
+                    ws.send(JSON.stringify({m: 'power', t: 'execute', d: {action: 'SLEEP', token: msg.d.token}}));
+                }
+            } catch (e) {}
+        };
+        ws.addEventListener('message', handler);
+        ws.send(JSON.stringify({m: 'power', t: 'request', d: {action: 'SLEEP'}}));
+    }
+}
+
+// --------------------------------------------------------------------------
+// Home Screen Rendering
+// --------------------------------------------------------------------------
+function renderHomeScreen() {
+    homeView.innerHTML = '';
+
+    // Quick Actions Row
+    const quickRow = document.createElement('div');
+    quickRow.className = 'quick-actions-row';
+
+    const muteBtn = document.createElement('button');
+    muteBtn.className = 'quick-action-btn';
+    muteBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+        <span>Mute</span>
+    `;
+    muteBtn.onclick = executeQuickMute;
+
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'quick-action-btn';
+    lockBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <span>Lock</span>
+    `;
+    lockBtn.onclick = () => {
+        triggerHaptic(20);
+        showConfirmDialog({
+            title: 'Lock PC?',
+            message: 'Are you sure you want to lock the workstation?',
+            confirmText: 'Lock',
+            onConfirm: executeQuickLock
+        });
+    };
+
+    const sleepBtn = document.createElement('button');
+    sleepBtn.className = 'quick-action-btn';
+    sleepBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <span>Sleep</span>
+    `;
+    sleepBtn.onclick = () => {
+        triggerHaptic(20);
+        showConfirmDialog({
+            title: 'Sleep PC?',
+            message: 'Are you sure you want to put your computer to sleep?',
+            confirmText: 'Sleep',
+            onConfirm: executeQuickSleep
+        });
+    };
+
+    quickRow.appendChild(muteBtn);
+    quickRow.appendChild(lockBtn);
+    quickRow.appendChild(sleepBtn);
+    homeView.appendChild(quickRow);
+
+    // 2-Column Module Grid (Equal fills, equal radius 22px)
     const grid = document.createElement('div');
     grid.className = 'grid-container';
 
-    // Icons map for modules
-    const icons = {
-        'screen': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
-        'keyboard': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path></svg>',
-        'touchpad': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><line x1="4" y1="12" x2="20" y2="12"></line><line x1="12" y1="12" x2="12" y2="20"></line></svg>',
-        'media': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
-        'power': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>'
-    };
-
-    // Render tiles
     currentLayout.forEach((modId, index) => {
         const modInfo = availableModules.find(m => m.id === modId) || { id: modId, name: modId };
-        
         const tile = document.createElement('div');
         tile.className = 'module-tile';
-        
-        tile.innerHTML = `
-            ${icons[modId] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>'}
-            <span>${modInfo.name}</span>
-        `;
-        
-        if (!isEditMode) {
-            tile.onclick = () => openModule(modId);
-            // Long press to enter edit mode
-            let pressTimer;
-            tile.ontouchstart = () => { pressTimer = setTimeout(() => { isEditMode = true; document.body.classList.add('edit-mode'); renderHomeScreen(); }, 600); };
-            tile.ontouchend = () => clearTimeout(pressTimer);
-            tile.onmousedown = tile.ontouchstart;
-            tile.onmouseup = tile.ontouchend;
-            tile.onmouseleave = tile.ontouchend;
-        }
 
-        if (isEditMode) {
-            const controls = document.createElement('div');
-            controls.style.cssText = 'position:absolute; top:-8px; left:-8px; background:var(--danger); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
-            controls.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
-            controls.onclick = (e) => {
+        const iconSvg = moduleIcons[modId] || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`;
+        const desc = moduleDescriptions[modId] || 'Remote control module';
+
+        tile.innerHTML = `
+            <div class="tile-icon">${iconSvg}</div>
+            <div class="tile-name">${modInfo.name}</div>
+            <div class="tile-desc">${desc}</div>
+        `;
+
+        if (!isEditMode) {
+            tile.onclick = () => {
+                triggerHaptic(10);
+                window.location.hash = '#' + modId;
+            };
+        } else {
+            // Edit controls (remove, move up, move down)
+            const editBar = document.createElement('div');
+            editBar.className = 'tile-edit-bar';
+
+            if (index > 0) {
+                const upBtn = document.createElement('button');
+                upBtn.className = 'tile-edit-btn';
+                upBtn.innerHTML = '↑';
+                upBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const item = currentLayout.splice(index, 1)[0];
+                    currentLayout.splice(index - 1, 0, item);
+                    saveLayout();
+                    renderHomeScreen();
+                };
+                editBar.appendChild(upBtn);
+            }
+
+            if (index < currentLayout.length - 1) {
+                const downBtn = document.createElement('button');
+                downBtn.className = 'tile-edit-btn';
+                downBtn.innerHTML = '↓';
+                downBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const item = currentLayout.splice(index, 1)[0];
+                    currentLayout.splice(index + 1, 0, item);
+                    saveLayout();
+                    renderHomeScreen();
+                };
+                editBar.appendChild(downBtn);
+            }
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'tile-edit-btn delete';
+            delBtn.innerHTML = '✕';
+            delBtn.onclick = (e) => {
                 e.stopPropagation();
                 currentLayout.splice(index, 1);
                 saveLayout();
                 renderHomeScreen();
             };
-            tile.appendChild(controls);
+            editBar.appendChild(delBtn);
+
+            tile.appendChild(editBar);
         }
 
         grid.appendChild(tile);
     });
-    
-    moduleContainer.appendChild(grid);
 
-    if (isEditMode) {
-        const unadded = availableModules.filter(m => !currentLayout.includes(m.id));
-        if (unadded.length > 0) {
-            const addSelect = document.createElement('select');
-            addSelect.style.cssText = 'margin-top: 24px; width: 100%; padding: 12px; border-radius: 12px; background: var(--card); color: white; border: 1px solid rgba(255,255,255,0.1); font-size: 1rem; outline: none;';
-            addSelect.innerHTML = '<option value="">+ Add Module</option>';
-            unadded.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.textContent = m.name;
-                addSelect.appendChild(opt);
-            });
-            addSelect.onchange = (e) => {
-                if (e.target.value) {
-                    currentLayout.push(e.target.value);
-                    saveLayout();
-                    renderHomeScreen();
-                }
-            };
-            moduleContainer.appendChild(addSelect);
-        }
+    homeView.appendChild(grid);
+
+    // Add a Remote (Dashed Button)
+    const unadded = availableModules.filter(m => !currentLayout.includes(m.id));
+    if (unadded.length > 0) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-remote-btn';
+        addBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Add a remote`;
+        addBtn.onclick = () => {
+            triggerHaptic(10);
+            showAddModulePicker(unadded);
+        };
+        homeView.appendChild(addBtn);
     }
 }
 
+function showAddModulePicker(unadded) {
+    const listHtml = unadded.map(m => `
+        <button class="pill-btn-outline add-item-btn" data-id="${m.id}" style="width:100%; justify-content:flex-start; gap:12px; margin-bottom:8px; padding:12px 16px;">
+            ${m.name}
+        </button>
+    `).join('');
+
+    showAuthOverlay(`
+        <div class="auth-card" style="max-width:320px;">
+            <h3 style="margin-bottom:16px;">Add Remote</h3>
+            <div style="width:100%; display:flex; flex-direction:column; margin-bottom:16px;">
+                ${listHtml}
+            </div>
+            <button id="close-add-modal" class="pill-btn-outline" style="width:100%;">Cancel</button>
+        </div>
+    `);
+
+    document.querySelectorAll('.add-item-btn').forEach(b => {
+        b.onclick = () => {
+            currentLayout.push(b.dataset.id);
+            saveLayout();
+            hideAuthOverlay();
+            renderHomeScreen();
+        };
+    });
+
+    const closeBtn = document.getElementById('close-add-modal');
+    if (closeBtn) closeBtn.onclick = hideAuthOverlay;
+}
+
 function saveLayout() {
-    localStorage.setItem('pr_layout', JSON.stringify(currentLayout));
+    safeStorageSet('pr_layout', JSON.stringify(currentLayout));
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({m: 'core', t: 'set_layout', d: {layout: currentLayout}}));
     }
 }
 
-function closeActiveModule() {
-    if (activeModule) {
-        activeModule.unmount();
-        ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
+// --------------------------------------------------------------------------
+// Settings Screen Rendering
+// --------------------------------------------------------------------------
+function renderSettingsScreen() {
+    settingsView.innerHTML = `
+        <div class="settings-header">
+            <button id="settings-back-btn" class="pill-btn-outline" aria-label="Back to home">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span style="margin-left:4px;">Back</span>
+            </button>
+            <h2 class="settings-title">Settings</h2>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Appearance</div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Theme</span>
+                    <span class="settings-subtext">Dark, Light, or follow system</span>
+                </div>
+                <div class="segmented-control">
+                    <button class="seg-btn ${userTheme === 'dark' ? 'active' : ''}" data-val="dark">Dark</button>
+                    <button class="seg-btn ${userTheme === 'light' ? 'active' : ''}" data-val="light">Light</button>
+                    <button class="seg-btn ${userTheme === 'system' ? 'active' : ''}" data-val="system">System</button>
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Bedside Mode</span>
+                    <span class="settings-subtext">Dims screen, mutes accents, disables glass</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="bedside-toggle" ${isBedside ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Touch and Feedback</div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Haptic Feedback</span>
+                    <span class="settings-subtext">Subtle vibration on interactions</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="haptics-toggle" ${hapticsEnabled ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Touchpad Speed</span>
+                    <span class="settings-subtext">Sensitivity multiplier</span>
+                </div>
+                <input type="range" id="speed-slider" class="speed-slider" min="0.5" max="2.0" step="0.1" value="${touchpadSpeed}">
+            </div>
+            <div class="settings-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <div class="settings-label">
+                        <span class="settings-name">Test Haptics</span>
+                        <span class="settings-subtext">Diagnose device vibration support</span>
+                    </div>
+                    <button id="test-haptics-btn" class="pill-btn-outline" style="padding:6px 14px; min-height:36px;">Test</button>
+                </div>
+                <div id="haptics-diag-info" class="settings-subtext mono" style="font-size:11px; word-break:break-all; width:100%; display:none; background:var(--card-alt); padding:8px 10px; border-radius:8px; border:1px solid var(--border); margin-top:4px;"></div>
+                <div class="settings-subtext" style="font-size:11px; color:var(--muted); margin-top:2px;">
+                    Note: If no vibration is felt, check your phone's Android <strong>Settings → Sound & vibration → Touch / Haptic feedback</strong> (if disabled in Android, Chrome silently suppresses vibration).
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Connection</div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Server Address</span>
+                    <span class="settings-subtext mono">${window.location.host || '127.0.0.1:8080'}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Session</div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Disconnect & Forget</span>
+                    <span class="settings-subtext">Forget pairing and return to PIN screen</span>
+                </div>
+                <button id="logout-btn" class="pill-btn-outline" style="color:var(--danger); border-color:var(--danger);">Disconnect</button>
+            </div>
+        </div>
+    `;
+
+    const backBtn = document.getElementById('settings-back-btn');
+    if (backBtn) {
+        backBtn.onclick = () => {
+            triggerHaptic(20);
+            window.location.hash = '#home';
+        };
     }
-    activeModule = null;
-    activeModuleId = null;
-    activeModuleContainer.innerHTML = '';
-    renderHomeScreen();
+
+    // Theme selector
+    settingsView.querySelectorAll('.seg-btn').forEach(btn => {
+        btn.onclick = () => {
+            triggerHaptic(10);
+            settingsView.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            applyTheme(btn.dataset.val);
+        };
+    });
+
+    // Bedside switch
+    const bedsideToggle = document.getElementById('bedside-toggle');
+    if (bedsideToggle) {
+        bedsideToggle.onchange = () => {
+            triggerHaptic(10);
+            applyBedside(bedsideToggle.checked);
+        };
+    }
+
+    // Haptics switch
+    const hapticsToggle = document.getElementById('haptics-toggle');
+    if (hapticsToggle) {
+        hapticsToggle.onchange = () => {
+            hapticsEnabled = hapticsToggle.checked;
+            safeStorageSet('pr_haptics', hapticsEnabled ? 'true' : 'false');
+            triggerHaptic(15);
+        };
+    }
+
+    // Touchpad speed
+    const speedSlider = document.getElementById('speed-slider');
+    if (speedSlider) {
+        speedSlider.oninput = () => {
+            touchpadSpeed = parseFloat(speedSlider.value) || 1.0;
+            safeStorageSet('pr_touchpad_speed', touchpadSpeed.toString());
+        };
+    }
+
+    // Test Haptics diagnostic button
+    const testHapticsBtn = document.getElementById('test-haptics-btn');
+    const hapticsDiag = document.getElementById('haptics-diag-info');
+    if (testHapticsBtn && hapticsDiag) {
+        testHapticsBtn.onclick = () => {
+            const supported = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+            let result = false;
+            if (supported) {
+                try {
+                    result = navigator.vibrate([40, 60, 40]);
+                } catch (e) {
+                    result = false;
+                }
+            }
+            const isSecure = typeof window !== 'undefined' && window.isSecureContext;
+            hapticsDiag.style.display = 'block';
+            hapticsDiag.innerHTML = `Vibration API: <b>${supported ? 'Supported' : 'Not supported'}</b><br>` +
+                `Dispatched: <b>${result ? 'True (Vibrated)' : 'False (Suppressed by OS/browser)'}</b><br>` +
+                `Secure Context: <b>${isSecure ? 'Yes (HTTPS/Localhost)' : 'No (HTTP LAN IP)'}</b>`;
+        };
+    }
+
+    // Logout / Disconnect
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.onclick = () => {
+            triggerHaptic(20);
+            showConfirmDialog({
+                title: 'Disconnect PC?',
+                message: 'Are you sure you want to forget this device and log out?',
+                confirmText: 'Disconnect',
+                isDanger: true,
+                onConfirm: () => {
+                    const deviceId = safeStorageGet('pr_device_id');
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        try {
+                            ws.send(JSON.stringify({
+                                m: 'core',
+                                t: 'unpair',
+                                d: { deviceId: deviceId || '' }
+                            }));
+                        } catch (e) {}
+                    }
+                    safeStorageRemove('pr_token');
+                    safeStorageRemove('pr_device_id');
+                    safeStorageRemove('pr_layout');
+                    isAuthenticated = false;
+                    if (ws) {
+                        try { ws.close(); } catch (e) {}
+                    }
+                    if (window.location.hash) {
+                        window.history.replaceState(null, '', window.location.pathname);
+                    }
+                    renderPinScreen();
+                }
+            });
+        };
+    }
 }
 
-window.addEventListener('popstate', (e) => {
-    if (activeModule) {
-        closeActiveModule();
-    }
-});
-
+// --------------------------------------------------------------------------
+// Module Loading & Active View
+// --------------------------------------------------------------------------
 async function openModule(id) {
     if (activeModule) {
-        closeActiveModule();
+        activeModule.unmount();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({m: 'core', t: 'close', d: {module: activeModuleId}}));
+        }
+        activeModule = null;
+        activeModuleId = null;
     }
-    
-    window.history.pushState({module: id}, '', '#' + id);
-    
-    moduleContainer.style.display = 'none';
-    activeModuleContainer.style.display = 'flex';
-    
+
+    activeModuleContainer.innerHTML = '';
+
     const headerBar = document.createElement('div');
-    headerBar.style.cssText = 'width:100%; height:60px; background:rgba(0,0,0,0.65); backdrop-filter:blur(20px); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; padding:0 16px; z-index:1000; flex-shrink:0;';
-    
+    headerBar.className = 'module-header-bar';
+
     const backBtn = document.createElement('button');
-    backBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:4px;"><polyline points="15 18 9 12 15 6"></polyline></svg> Home';
-    backBtn.style.cssText = 'background:transparent; color:var(--accent); font-weight:600; font-size:1.1rem; display:flex; align-items:center; padding:8px 0; border:none;';
+    backBtn.className = 'module-back-btn';
+    backBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg> Back`;
     backBtn.onclick = () => {
-        window.history.back(); // Triggers popstate which calls closeActiveModule
+        triggerHaptic(20);
+        window.location.hash = '#home';
     };
-    
+
     const title = document.createElement('span');
+    title.className = 'module-header-title';
     title.textContent = availableModules.find(m => m.id === id)?.name || id;
-    title.style.cssText = 'position:absolute; left:50%; transform:translateX(-50%); font-weight:600; font-size:1.1rem;';
-    
-    const statusDot = document.createElement('div');
-    statusDot.id = 'module-status-dot';
-    statusDot.style.cssText = 'width:12px; height:12px; border-radius:50%; margin-left:auto; transition: background 0.3s;';
-    
+
+    const statusDotEl = document.createElement('span');
+    statusDotEl.id = 'module-status-dot';
+    statusDotEl.className = statusDot ? statusDot.className : 'status-dot disconnected';
+
     headerBar.appendChild(backBtn);
     headerBar.appendChild(title);
-    headerBar.appendChild(statusDot);
+    headerBar.appendChild(statusDotEl);
     activeModuleContainer.appendChild(headerBar);
-    
-    // Set initial color based on current statusIndicator
-    if (statusIndicator.className === 'connected') statusDot.style.background = '#32d74b';
-    else if (statusIndicator.className === 'reconnecting') statusDot.style.background = '#ffbd2e';
-    else statusDot.style.background = '#ff453a';
 
     const modContainer = document.createElement('div');
     modContainer.style.cssText = 'flex:1; width:100%; position:relative; overflow:auto;';
@@ -220,11 +761,13 @@ async function openModule(id) {
             const module = await import('./modules/' + id + '.js?v=' + Date.now());
             loadedModules[id] = module.default;
         }
-        
+
         activeModule = loadedModules[id];
         activeModuleId = id;
-        ws.send(JSON.stringify({m: 'core', t: 'open', d: {module: id}}));
-        
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({m: 'core', t: 'open', d: {module: id}}));
+        }
+
         activeModuleApi = {
             send: (type, data) => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
@@ -234,7 +777,7 @@ async function openModule(id) {
             on: null,
             _ws: ws
         };
-        
+
         activeModule.mount(modContainer, activeModuleApi);
     } catch (e) {
         console.error("Failed to load module " + id, e);
@@ -242,22 +785,23 @@ async function openModule(id) {
     }
 }
 
+// --------------------------------------------------------------------------
+// Pairing Screen & Locked Out Logic (Strict fit-the-phone & keyboard block)
+// --------------------------------------------------------------------------
 let lockoutTimer = null;
-let lockoutAnnounceTimer = null;
 let currentEnteredPin = "";
 
 function renderPinScreen() {
     currentEnteredPin = "";
     if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
-    if (lockoutAnnounceTimer) { clearInterval(lockoutAnnounceTimer); lockoutAnnounceTimer = null; }
 
     showAuthOverlay(`
-        <div id="pin-screen-container" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:320px;">
+        <div class="auth-card" id="pin-screen-container">
             <div id="pin-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-            <h2 id="pin-screen-title" style="font-size:2rem; font-weight:700; margin-bottom:8px;">Enter PIN</h2>
-            <p id="pin-screen-subtitle" style="color:var(--muted); margin-bottom:24px; font-size:0.95rem;">Please enter the 6-digit PIN displayed on your PC.</p>
+            <h2 id="pin-screen-title" class="heading" style="font-size:clamp(24px, 7vw, 30px); margin-bottom:8px;">Pair this phone</h2>
+            <p id="pin-screen-subtitle" style="color:var(--muted); margin-bottom:20px; font-size:clamp(13px, 3.5vw, 15px);">Enter the 6-digit PIN displayed on your PC.</p>
             
-            <div id="pin-boxes" style="display:flex; gap:8px; margin-bottom:20px;" aria-label="PIN digits" tabindex="-1">
+            <div id="pin-boxes" class="pin-boxes-container" aria-label="PIN digits" tabindex="-1">
                 <div class="pin-digit-box" data-idx="0"></div>
                 <div class="pin-digit-box" data-idx="1"></div>
                 <div class="pin-digit-box" data-idx="2"></div>
@@ -266,9 +810,9 @@ function renderPinScreen() {
                 <div class="pin-digit-box" data-idx="5"></div>
             </div>
 
-            <input type="tel" id="pin-input" class="pin-input" maxlength="6" readonly inputmode="none" tabindex="-1" autocomplete="off" style="opacity:0; position:absolute; pointer-events:none; width:1px; height:1px;">
+            <input type="tel" id="pin-input" class="pin-input" maxlength="6" readonly inputmode="none" tabindex="-1" autocomplete="off">
 
-            <div id="pin-keypad" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; width:100%; max-width:280px; margin-top:8px;">
+            <div id="pin-keypad" class="pin-keypad">
                 <button type="button" class="keypad-btn" data-key="1">1</button>
                 <button type="button" class="keypad-btn" data-key="2">2</button>
                 <button type="button" class="keypad-btn" data-key="3">3</button>
@@ -306,9 +850,9 @@ function updatePinBoxes() {
 
 function setupPinListeners() {
     const hiddenInput = document.getElementById('pin-input');
-    const container = document.getElementById('pin-screen-container');
 
     const handleDigit = (digit) => {
+        triggerHaptic(10);
         if (currentEnteredPin.length < 6) {
             currentEnteredPin += digit;
             updatePinBoxes();
@@ -320,6 +864,7 @@ function setupPinListeners() {
     };
 
     const handleBackspace = () => {
+        triggerHaptic(10);
         if (currentEnteredPin.length > 0) {
             currentEnteredPin = currentEnteredPin.slice(0, -1);
             updatePinBoxes();
@@ -328,6 +873,7 @@ function setupPinListeners() {
     };
 
     const handleClear = () => {
+        triggerHaptic(10);
         currentEnteredPin = "";
         updatePinBoxes();
         if (hiddenInput) hiddenInput.value = "";
@@ -362,7 +908,7 @@ function setupPinListeners() {
 
 function submitCurrentPin() {
     if (currentEnteredPin.length === 6 && ws && ws.readyState === WebSocket.OPEN) {
-        let deviceId = localStorage.getItem('pr_device_id') || '';
+        let deviceId = safeStorageGet('pr_device_id', '');
         ws.send(JSON.stringify({m: 'core', t: 'pin', d: {pin: currentEnteredPin, deviceId}}));
     }
 }
@@ -375,7 +921,6 @@ function showLockedOutState(retryAfterSeconds) {
     }
 
     if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
-    if (lockoutAnnounceTimer) { clearInterval(lockoutAnnounceTimer); lockoutAnnounceTimer = null; }
 
     currentEnteredPin = "";
     updatePinBoxes();
@@ -435,7 +980,6 @@ function showLockedOutState(retryAfterSeconds) {
         if (remMs <= 0) {
             clearInterval(lockoutTimer);
             lockoutTimer = null;
-            if (lockoutAnnounceTimer) { clearInterval(lockoutAnnounceTimer); lockoutAnnounceTimer = null; }
             restorePinEntry();
             return;
         }
@@ -493,21 +1037,24 @@ function restorePinEntry() {
     }
 }
 
+// --------------------------------------------------------------------------
+// WebSocket Connection & Event Loop
+// --------------------------------------------------------------------------
 function connect() {
     updateStatus('reconnecting', 'Connecting...');
-    
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
+
     ws = new WebSocket(wsUrl);
-    
+
     ws.onopen = () => {
         updateStatus('reconnecting', 'Authenticating...');
         currentDelay = 500;
-        
-        let token = localStorage.getItem('pr_token') || '';
-        let deviceId = localStorage.getItem('pr_device_id') || '';
-        
+
+        let token = safeStorageGet('pr_token', '');
+        let deviceId = safeStorageGet('pr_device_id', '');
+
         ws.send(JSON.stringify({
             m: 'core',
             t: 'hello',
@@ -518,19 +1065,31 @@ function connect() {
             }
         }));
     };
-    
+
     ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        
+        let msg;
+        try {
+            msg = JSON.parse(event.data);
+        } catch (e) {
+            return;
+        }
+
         if (msg.m === 'core') {
             if (msg.t === 'need_pin') {
+                isAuthenticated = false;
                 renderPinScreen();
             } else if (msg.t === 'pending_approval') {
-                showAuthOverlay(`<svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--accent)" stroke-width="2" fill="none" style="margin-bottom:20px; animation: jiggle 2s infinite;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    <h2 style="font-size:1.5rem; font-weight:600; margin-bottom:12px;">Waiting for approval...</h2><p style="color:var(--muted);">Please accept the connection on your PC.</p>`);
+                isAuthenticated = false;
+                showAuthOverlay(`
+                    <div class="auth-card">
+                        <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--accent)" stroke-width="2" fill="none" style="margin-bottom:20px; animation: status-pulse 1.6s infinite ease-in-out;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <h2 class="heading" style="font-size:1.6rem; margin-bottom:8px;">Waiting for approval...</h2>
+                        <p style="color:var(--muted); font-size:1rem;">Please accept the connection on your PC.</p>
+                    </div>
+                `);
             } else if (msg.t === 'paired') {
-                localStorage.setItem('pr_token', msg.d.token);
-                localStorage.setItem('pr_device_id', msg.d.deviceId);
+                safeStorageSet('pr_token', msg.d.token);
+                safeStorageSet('pr_device_id', msg.d.deviceId);
                 hideAuthOverlay();
                 ws.send(JSON.stringify({
                     m: 'core',
@@ -556,38 +1115,46 @@ function connect() {
                     showLockedOutState(retryAfter);
                 } else if (msg.d && (msg.d.type === 'revoked' || msg.d.code === 'revoked')) {
                     isRevoked = true;
+                    isAuthenticated = false;
                     cleanup();
                     if (activeModule) {
-                        closeActiveModule();
+                        activeModule.unmount();
+                        activeModule = null;
+                        activeModuleId = null;
                     }
-                    localStorage.removeItem('pr_token');
-                    localStorage.removeItem('pr_device_id');
-                    showAuthOverlay(`<svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:20px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-                        <h2 style="font-size:2rem; font-weight:700; margin-bottom:12px;">Device Revoked</h2><p style="color:var(--muted); font-size:1.1rem;">Please refresh the page to pair again.</p>`);
+                    safeStorageRemove('pr_token');
+                    safeStorageRemove('pr_device_id');
+                    showAuthOverlay(`
+                        <div class="auth-card">
+                            <svg viewBox="0 0 24 24" width="60" height="60" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:16px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                            <h2 class="heading" style="font-size:1.8rem; margin-bottom:8px;">Device Revoked</h2>
+                            <p style="color:var(--muted); font-size:1rem;">Access has been revoked from the host PC. Please refresh the page to pair again.</p>
+                        </div>
+                    `);
                     if (ws) {
                         try { ws.close(); } catch (e) {}
                     }
                 }
             } else if (msg.t === 'ready') {
+                isAuthenticated = true;
                 hideAuthOverlay();
                 updateStatus('connected', 'Connected');
-                
+
                 availableModules = msg.d.modules || [];
                 if (msg.d.layout) {
                     currentLayout = msg.d.layout;
-                    localStorage.setItem('pr_layout', JSON.stringify(currentLayout));
+                    safeStorageSet('pr_layout', JSON.stringify(currentLayout));
                 } else {
-                    const cached = localStorage.getItem('pr_layout');
-                    if (cached) currentLayout = JSON.parse(cached);
+                    const cached = safeStorageGet('pr_layout');
+                    if (cached) {
+                        try { currentLayout = JSON.parse(cached); } catch (e) {}
+                    }
                 }
-                
-                if (activeModuleId) {
-                    // Re-open active module on reconnect
-                    ws.send(JSON.stringify({m: 'core', t: 'open', d: {module: activeModuleId}}));
-                } else {
-                    renderHomeScreen();
-                }
-                
+
+                // Initial route load
+                const initialRoute = window.location.hash.replace(/^#/, '');
+                renderRoute(initialRoute || 'home');
+
                 if (pingInterval) clearInterval(pingInterval);
                 pingInterval = setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
@@ -601,11 +1168,12 @@ function connect() {
             } else if (msg.t === 'layout') {
                 availableModules = msg.d.available || [];
                 currentLayout = msg.d.layout || [];
-                localStorage.setItem('pr_layout', JSON.stringify(currentLayout));
-                if (!activeModuleId) renderHomeScreen();
+                safeStorageSet('pr_layout', JSON.stringify(currentLayout));
+                const route = window.location.hash.replace(/^#/, '');
+                if (!route || route === 'home') renderHomeScreen();
             } else if (msg.t === 'pong') {
                 const rtt = Date.now() - (msg.i || 0);
-                updateStatus('connected', `Connected (${rtt}ms)`);
+                updateStatus('connected', `Connected, ${rtt} ms`);
             }
         } else if (activeModuleId && msg.m === activeModuleId) {
             if (activeModuleApi && typeof activeModuleApi.on === 'function') {
@@ -613,14 +1181,13 @@ function connect() {
             }
         }
     };
-    
+
     ws.onclose = () => {
         cleanup();
         scheduleReconnect();
     };
-    
+
     ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
         ws.close();
     };
 }
@@ -634,17 +1201,27 @@ function cleanup() {
 
 function scheduleReconnect() {
     if (isRevoked) return;
-    updateStatus('disconnected', `Reconnecting in ${currentDelay}ms...`);
+    updateStatus('reconnecting', 'Reconnecting...');
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connect, currentDelay);
     currentDelay = Math.min(currentDelay * 2, 5000);
 }
 
-// Initial render from cache
-const cached = localStorage.getItem('pr_layout');
-if (cached) {
-    currentLayout = JSON.parse(cached);
-    renderHomeScreen();
+// Initial render from local cache if present
+const cachedLayout = safeStorageGet('pr_layout');
+if (cachedLayout) {
+    try {
+        currentLayout = JSON.parse(cachedLayout);
+        renderHomeScreen();
+    } catch (e) {}
 }
 
 connect();
+
+if (typeof window !== 'undefined') {
+    window.renderPinScreen = renderPinScreen;
+    window.showLockedOutState = showLockedOutState;
+    window.showConfirmDialog = showConfirmDialog;
+    window.showAuthOverlay = showAuthOverlay;
+    window.hideAuthOverlay = hideAuthOverlay;
+}

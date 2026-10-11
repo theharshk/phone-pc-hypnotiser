@@ -81,4 +81,19 @@ class KeyboardModuleTest {
         assertEquals(2, inputAdapter.calls.size());
         assertEquals("keyUp(13)", inputAdapter.calls.get(1));
     }
+
+    @Test
+    void testAlphanumericKeyWithWinModifier() {
+        ObjectNode data = mapper.createObjectNode();
+        data.put("code", "r");
+        data.put("win", true);
+        data.put("action", "press");
+        keyboardModule.onMessage(session, "key", data);
+
+        assertEquals(4, inputAdapter.calls.size());
+        assertEquals("keyDown(91)", inputAdapter.calls.get(0)); // VK_LWIN = 0x5B = 91
+        assertEquals("keyDown(82)", inputAdapter.calls.get(1)); // 'R' = 0x52 = 82
+        assertEquals("keyUp(82)", inputAdapter.calls.get(2));
+        assertEquals("keyUp(91)", inputAdapter.calls.get(3));
+    }
 }

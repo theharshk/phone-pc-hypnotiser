@@ -31,7 +31,9 @@ class AuthTests {
 
     @BeforeEach
     void setUp() throws Exception {
-        System.setProperty("user.dir", Files.createTempDirectory("phoneremotetest").toString());
+        String tempDir = Files.createTempDirectory("phoneremotetest").toString();
+        System.setProperty("user.dir", tempDir);
+        System.setProperty("test.config.dir", tempDir);
         configStore = new ConfigStore();
         lockoutTracker = new LockoutTracker();
     }
@@ -396,4 +398,53 @@ class AuthTests {
         assertEquals("locked_out", doubledNode.path("d").path("code").asText());
         assertEquals(4, doubledNode.path("d").path("retryAfterSeconds").asInt());
     }
+
+    @Test
+    void testUnpairMessageRemovesDeviceAndRevokesSession() throws Exception {
+        String deviceId = "dev-unpair-1";
+        String tokenRaw = "unpair_token_123";
+        ConfigStore.DeviceInfo info = new ConfigStore.DeviceInfo();
+        info.deviceId = deviceId;
+        info.tokenHash = configStore.hashToken(tokenRaw);
+        configStore.addDevice(info);
+
+        TerminalPromptService promptService = mock(TerminalPromptService.class);
+        ModuleRegistry registry = new ModuleRegistry(java.util.Collections.emptyList());
+        RemoteSocketHandler handler = new RemoteSocketHandler(registry, configStore, lockoutTracker, promptService);
+
+        WebSocketSession ws = mock(WebSocketSession.class);
+        when(ws.getId()).thenReturn("ws-unpair-test");
+        when(ws.isOpen()).thenReturn(true);
+        handler.afterConnectionEstablished(ws);
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 1. Authenticate with hello
+        ObjectNode helloMsg = mapper.createObjectNode();
+        helloMsg.put("m", "core");
+        helloMsg.put("t", "hello");
+        ObjectNode helloD = mapper.createObjectNode();
+        helloD.put("deviceId", deviceId);
+        helloD.put("token", tokenRaw);
+        helloMsg.set("d", helloD);
+        handler.handleMessage(ws, new TextMessage(mapper.writeValueAsString(helloMsg)));
+
+        assertNotNull(configStore.getDevice(deviceId));
+        assertEquals(1, handler.getActiveSessionCount());
+
+        // 2. Send unpair
+        ObjectNode unpairMsg = mapper.createObjectNode();
+        unpairMsg.put("m", "core");
+        unpairMsg.put("t", "unpair");
+        ObjectNode unpairD = mapper.createObjectNode();
+        unpairD.put("deviceId", deviceId);
+        unpairMsg.set("d", unpairD);
+        handler.handleMessage(ws, new TextMessage(mapper.writeValueAsString(unpairMsg)));
+
+        // 3. Verify device removed from config and session closed
+        assertNull(configStore.getDevice(deviceId));
+        assertEquals(0, handler.getActiveSessionCount());
+        verify(ws, atLeastOnce()).close();
+    }
 }
+

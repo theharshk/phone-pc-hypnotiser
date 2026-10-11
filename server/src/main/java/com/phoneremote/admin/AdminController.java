@@ -120,22 +120,25 @@ public class AdminController {
         String csrf = (String) session.getAttribute("csrf_token");
 
         java.io.File f = new java.io.File("web/admin/index.html");
+        if (!f.exists()) {
+            f = new java.io.File("../web/admin/index.html");
+        }
         if (!f.exists()) return "Missing web/admin/index.html";
-        String html = new String(java.nio.file.Files.readAllBytes(f.toPath()));
+        String html = new String(java.nio.file.Files.readAllBytes(f.toPath()), java.nio.charset.StandardCharsets.UTF_8);
         
         // Inject CSRF token via a meta tag
         html = html.replace("<head>", "<head><meta name=\"csrf-token\" content=\"" + csrf + "\">");
         return html;
     }
 
-    @GetMapping(produces = "text/html")
+    @GetMapping(produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String adminPage(HttpServletRequest request, HttpServletResponse response) throws IOException {
         if (!checkAccess(request, response)) return null;
         return renderSPA(request);
     }
 
-    @GetMapping("/logs")
+    @GetMapping(value = "/logs", produces = "text/html;charset=UTF-8")
     @ResponseBody
     public String logsPage(HttpServletRequest request, HttpServletResponse response) throws IOException {
         if (!checkAccess(request, response)) return null;

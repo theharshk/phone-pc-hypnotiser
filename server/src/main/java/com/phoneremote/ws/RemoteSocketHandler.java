@@ -256,6 +256,18 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                 }
                 configStore.updateDeviceLayout(session.getDeviceId(), newLayout);
             }
+        } else if ("unpair".equals(t) && session.isAuthenticated()) {
+            String deviceId = session.getDeviceId();
+            if (deviceId == null || deviceId.isEmpty()) {
+                deviceId = d.path("deviceId").asText("");
+            }
+            if (deviceId != null && !deviceId.isEmpty()) {
+                configStore.removeDevice(deviceId);
+                revokeDevice(deviceId);
+            }
+            if (session.isAuthenticated()) {
+                revokeSession(session);
+            }
         }
     }
 

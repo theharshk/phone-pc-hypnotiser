@@ -44,13 +44,24 @@ public class ConfigStore {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public ConfigStore() {
+        this(resolveDefaultConfigPath());
+    }
+
+    public ConfigStore(Path configPath) {
+        this.configPath = configPath;
+        load();
+    }
+
+    private static Path resolveDefaultConfigPath() {
+        String testDir = System.getProperty("test.config.dir");
+        if (testDir != null && !testDir.isEmpty()) {
+            return Paths.get(testDir, "config.json");
+        }
         String appData = System.getenv("APPDATA");
         if (appData != null && !appData.isEmpty()) {
-            configPath = Paths.get(appData, "PhoneRemote", "config.json");
-        } else {
-            configPath = Paths.get(System.getProperty("user.dir"), "config.json");
+            return Paths.get(appData, "PhoneRemote", "config.json");
         }
-        load();
+        return Paths.get(System.getProperty("user.dir"), "config.json");
     }
 
     private void load() {

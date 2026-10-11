@@ -1,8 +1,8 @@
 -------------------------------------------------------------------------------
 Test set: com.phoneremote.admin.AdminLogsTest
 -------------------------------------------------------------------------------
-Tests run: 5, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 0.929 s <<< FAILURE! -- in com.phoneremote.admin.AdminLogsTest
-com.phoneremote.admin.AdminLogsTest.testLogbackConfiguration -- Time elapsed: 0.030 s <<< FAILURE!
+Tests run: 5, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 0.584 s <<< FAILURE! -- in com.phoneremote.admin.AdminLogsTest
+com.phoneremote.admin.AdminLogsTest.testLogbackConfiguration -- Time elapsed: 0.016 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: ASYNC_FRAME_FILE appender should be present to prevent blocking capture thread ==> expected: not <null>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
@@ -14,7 +14,7 @@ org.opentest4j.AssertionFailedError: ASYNC_FRAME_FILE appender should be present
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 
-com.phoneremote.admin.AdminLogsTest.testRingBufferSizeLimit -- Time elapsed: 0.024 s <<< FAILURE!
+com.phoneremote.admin.AdminLogsTest.testRingBufferSizeLimit -- Time elapsed: 0.019 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: Ring buffer should not exceed 500 ==> expected: <500> but was: <6>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
@@ -26,7 +26,7 @@ org.opentest4j.AssertionFailedError: Ring buffer should not exceed 500 ==> expec
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
 
-com.phoneremote.admin.AdminLogsTest.testLogFilteringAndHtmlEscaping -- Time elapsed: 0.468 s <<< FAILURE!
+com.phoneremote.admin.AdminLogsTest.testLogFilteringAndHtmlEscaping -- Time elapsed: 0.274 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: <true> but was: <false>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
