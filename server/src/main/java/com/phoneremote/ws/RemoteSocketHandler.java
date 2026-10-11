@@ -142,6 +142,16 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             } else {
                 // Not paired yet
                 if (configStore.isPinSet()) {
+                    String keyIp = "IP:" + ip;
+                    String keyDevice = "DEV:" + deviceId;
+                    String keyGlobal = "GLOBAL";
+                    long remain = getLockoutRemaining(keyIp, keyDevice, keyGlobal);
+                    if (remain > 0) {
+                        int retrySec = (int) Math.ceil(remain / 1000.0);
+                        sendLockedOutError(session, retrySec);
+                        return;
+                    }
+
                     ObjectNode response = mapper.createObjectNode();
                     response.put("m", "core");
                     response.put("t", "need_pin");
@@ -162,8 +172,10 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             String keyDevice = "DEV:" + deviceId;
             String keyGlobal = "GLOBAL";
 
-            if (lockoutTracker.isLockedOut(keyIp) || lockoutTracker.isLockedOut(keyDevice) || lockoutTracker.isLockedOut(keyGlobal)) {
-                sendError(session, "locked_out");
+            long remain = getLockoutRemaining(keyIp, keyDevice, keyGlobal);
+            if (remain > 0) {
+                int retrySec = (int) Math.ceil(remain / 1000.0);
+                sendLockedOutError(session, retrySec);
                 return;
             }
 
@@ -176,7 +188,13 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                 lockoutTracker.recordStrike(keyIp);
                 lockoutTracker.recordStrike(keyDevice);
                 lockoutTracker.recordStrike(keyGlobal);
-                sendError(session, "bad_pin");
+                long newRemain = getLockoutRemaining(keyIp, keyDevice, keyGlobal);
+                if (newRemain > 0) {
+                    int retrySec = (int) Math.ceil(newRemain / 1000.0);
+                    sendLockedOutError(session, retrySec);
+                } else {
+                    sendError(session, "bad_pin");
+                }
             }
 
         } else if ("ping".equals(t)) {
@@ -270,6 +288,27 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             ObjectNode data = mapper.createObjectNode();
             data.put("token", token);
             data.put("deviceId", deviceId);
+            response.set("d", data);
+            session.send(mapper.writeValueAsString(response));
+        } catch (Exception e) {}
+    }
+
+    private long getLockoutRemaining(String keyIp, String keyDevice, String keyGlobal) {
+        long remIp = lockoutTracker.getLockoutRemaining(keyIp);
+        long remDev = lockoutTracker.getLockoutRemaining(keyDevice);
+        long remGlob = lockoutTracker.getLockoutRemaining(keyGlobal);
+        return Math.max(remIp, Math.max(remDev, remGlob));
+    }
+
+    private void sendLockedOutError(Session session, int retryAfterSeconds) {
+        try {
+            ObjectNode response = mapper.createObjectNode();
+            response.put("m", "core");
+            response.put("t", "error");
+            ObjectNode data = mapper.createObjectNode();
+            data.put("type", "locked_out");
+            data.put("code", "locked_out");
+            data.put("retryAfterSeconds", retryAfterSeconds);
             response.set("d", data);
             session.send(mapper.writeValueAsString(response));
         } catch (Exception e) {}

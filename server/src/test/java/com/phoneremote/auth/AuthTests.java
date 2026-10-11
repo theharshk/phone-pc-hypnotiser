@@ -8,6 +8,7 @@ import com.phoneremote.terminal.TerminalPromptService;
 import com.phoneremote.ws.LockoutTracker;
 import com.phoneremote.ws.RemoteSocketHandler;
 import com.phoneremote.ws.Session;
+import com.phoneremote.ws.TimeSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -253,5 +254,146 @@ class AuthTests {
         assertEquals(0, handler.getActiveSessionCount());
         verify(mockModule, times(1)).onClose(any(Session.class));
         verify(ws, times(1)).close();
+    }
+
+    static class MutableTimeSource implements TimeSource {
+        long current = 1000000L;
+        @Override
+        public long currentTimeMillis() {
+            return current;
+        }
+    }
+
+    @Test
+    void testLockoutBehaviorWithFakeClock() throws Exception {
+        MutableTimeSource fakeClock = new MutableTimeSource();
+        long shortLockoutMs = 2000L; // 2 seconds
+        LockoutTracker tracker = new LockoutTracker(fakeClock, shortLockoutMs, 100000L);
+
+        configStore.setPin("123456");
+        RemoteSocketHandler handler = new RemoteSocketHandler(
+                new ModuleRegistry(java.util.Collections.emptyList()),
+                configStore,
+                tracker,
+                mock(TerminalPromptService.class)
+        );
+
+        WebSocketSession ws = mock(WebSocketSession.class);
+        when(ws.getId()).thenReturn("ws-lockout-test");
+        when(ws.isOpen()).thenReturn(true);
+        handler.afterConnectionEstablished(ws);
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        // Helper to send a PIN
+        java.util.function.Consumer<String> sendPin = (pinValue) -> {
+            try {
+                ObjectNode msg = mapper.createObjectNode();
+                msg.put("m", "core");
+                msg.put("t", "pin");
+                ObjectNode d = mapper.createObjectNode();
+                d.put("pin", pinValue);
+                d.put("deviceId", "dev-test");
+                msg.set("d", d);
+                handler.handleMessage(ws, new TextMessage(mapper.writeValueAsString(msg)));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+
+        // a. 5 wrong PINs trigger locked_out with retryAfterSeconds equal to the first lockout (2 seconds)
+        for (int i = 0; i < 4; i++) {
+            sendPin.accept("999999");
+        }
+        assertFalse(tracker.isLockedOut("DEV:dev-test"));
+
+        // 5th wrong PIN
+        sendPin.accept("999999");
+        assertTrue(tracker.isLockedOut("DEV:dev-test"));
+
+        org.mockito.ArgumentCaptor<TextMessage> textCaptor = org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+        verify(ws, atLeastOnce()).sendMessage(textCaptor.capture());
+        TextMessage lastMsg = textCaptor.getValue();
+        com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(lastMsg.getPayload());
+        assertEquals("error", node.path("t").asText());
+        assertEquals("locked_out", node.path("d").path("code").asText());
+        assertEquals(2, node.path("d").path("retryAfterSeconds").asInt());
+
+        // b. A correct PIN during the lockout still gets locked_out and does not pair
+        Mockito.clearInvocations(ws);
+        when(ws.isOpen()).thenReturn(true);
+        sendPin.accept("123456");
+        verify(ws, atLeastOnce()).sendMessage(textCaptor.capture());
+        TextMessage duringMsg = textCaptor.getValue();
+        com.fasterxml.jackson.databind.JsonNode duringNode = mapper.readTree(duringMsg.getPayload());
+        assertEquals("error", duringNode.path("t").asText());
+        assertEquals("locked_out", duringNode.path("d").path("code").asText());
+        assertEquals(0, handler.getActiveSessionCount());
+
+        // c. A PIN sent during the lockout does not increase the failure count and does not extend the lockout
+        long remainBefore = tracker.getLockoutRemaining("DEV:dev-test");
+        sendPin.accept("000000"); // wrong PIN during lockout
+        long remainAfter = tracker.getLockoutRemaining("DEV:dev-test");
+        assertEquals(remainBefore, remainAfter);
+
+        // d. After the fake clock passes the lockout, a correct PIN pairs
+        fakeClock.current += 2500L; // advance clock by 2.5s (> 2.0s)
+        assertFalse(tracker.isLockedOut("DEV:dev-test"));
+
+        Mockito.clearInvocations(ws);
+        when(ws.isOpen()).thenReturn(true);
+        sendPin.accept("123456"); // correct PIN
+        verify(ws, atLeastOnce()).sendMessage(textCaptor.capture());
+        boolean paired = false;
+        for (TextMessage tm : textCaptor.getAllValues()) {
+            com.fasterxml.jackson.databind.JsonNode n = mapper.readTree(tm.getPayload());
+            if ("paired".equals(n.path("t").asText())) paired = true;
+        }
+        assertTrue(paired, "Should receive paired message after lockout expired");
+        assertEquals(1, handler.getActiveSessionCount());
+
+        // e. After a second round of failures, the lockout doubles (4 seconds)
+        // Reset session by creating new connection
+        WebSocketSession ws2 = mock(WebSocketSession.class);
+        when(ws2.getId()).thenReturn("ws-lockout-test2");
+        when(ws2.isOpen()).thenReturn(true);
+        handler.afterConnectionEstablished(ws2);
+
+        java.util.function.Consumer<String> sendPin2 = (pinValue) -> {
+            try {
+                ObjectNode msg = mapper.createObjectNode();
+                msg.put("m", "core");
+                msg.put("t", "pin");
+                ObjectNode d = mapper.createObjectNode();
+                d.put("pin", pinValue);
+                d.put("deviceId", "dev-test-2");
+                msg.set("d", d);
+                handler.handleMessage(ws2, new TextMessage(mapper.writeValueAsString(msg)));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+
+        // First round: 5 strikes -> 2 seconds lockout
+        for (int i = 0; i < 5; i++) {
+            sendPin2.accept("000000");
+        }
+        assertEquals(2000L, tracker.getLockoutRemaining("DEV:dev-test-2"));
+
+        // Advance fake clock past the first lockout
+        fakeClock.current += 2500L;
+        assertFalse(tracker.isLockedOut("DEV:dev-test-2"));
+
+        // 6th strike (second round failure) -> doubles to 4 seconds
+        sendPin2.accept("000000");
+        assertEquals(4000L, tracker.getLockoutRemaining("DEV:dev-test-2"));
+
+        org.mockito.ArgumentCaptor<TextMessage> textCaptor2 = org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+        verify(ws2, atLeastOnce()).sendMessage(textCaptor2.capture());
+        TextMessage doubledMsg = textCaptor2.getValue();
+        com.fasterxml.jackson.databind.JsonNode doubledNode = mapper.readTree(doubledMsg.getPayload());
+        assertEquals("error", doubledNode.path("t").asText());
+        assertEquals("locked_out", doubledNode.path("d").path("code").asText());
+        assertEquals(4, doubledNode.path("d").path("retryAfterSeconds").asInt());
     }
 }

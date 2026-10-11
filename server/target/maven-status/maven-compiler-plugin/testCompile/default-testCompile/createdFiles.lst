@@ -7,4 +7,5 @@ com\phoneremote\module\impl\MediaModuleTest.class
 com\phoneremote\module\impl\PowerModuleTest$1.class
 com\phoneremote\host\LayoutTests.class
 com\phoneremote\auth\AuthTests.class
+com\phoneremote\auth\AuthTests$MutableTimeSource.class
 com\phoneremote\module\impl\KeyboardModuleTest.class

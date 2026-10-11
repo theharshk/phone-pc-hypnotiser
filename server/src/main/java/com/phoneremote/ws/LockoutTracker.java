@@ -1,5 +1,6 @@
 package com.phoneremote.ws;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
@@ -13,17 +14,36 @@ public class LockoutTracker {
     }
 
     private final Map<String, StrikeRecord> records = new ConcurrentHashMap<>();
+    private final TimeSource timeSource;
+    private final long baseLockoutMs;
+    private final long maxLockoutMs;
+
+    public LockoutTracker() {
+        this(TimeSource.SYSTEM, 5 * 60 * 1000L, 24 * 60 * 60 * 1000L);
+    }
+
+    public LockoutTracker(
+            @Value("${lockout.base-ms:300000}") long baseLockoutMs,
+            @Value("${lockout.max-ms:86400000}") long maxLockoutMs) {
+        this(TimeSource.SYSTEM, baseLockoutMs, maxLockoutMs);
+    }
+
+    public LockoutTracker(TimeSource timeSource, long baseLockoutMs, long maxLockoutMs) {
+        this.timeSource = timeSource != null ? timeSource : TimeSource.SYSTEM;
+        this.baseLockoutMs = baseLockoutMs;
+        this.maxLockoutMs = maxLockoutMs;
+    }
 
     public boolean isLockedOut(String key) {
         StrikeRecord record = records.get(key);
         if (record == null) return false;
-        return System.currentTimeMillis() < record.lockedUntil;
+        return timeSource.currentTimeMillis() < record.lockedUntil;
     }
 
     public long getLockoutRemaining(String key) {
         StrikeRecord record = records.get(key);
         if (record == null) return 0;
-        long remain = record.lockedUntil - System.currentTimeMillis();
+        long remain = record.lockedUntil - timeSource.currentTimeMillis();
         return Math.max(0, remain);
     }
 
@@ -32,11 +52,10 @@ public class LockoutTracker {
         record.strikes++;
         if (record.strikes >= 5) {
             int repeats = record.strikes - 5;
-            long lockoutMs = 5 * 60 * 1000L; // 5 min base
+            long lockoutMs = baseLockoutMs;
             lockoutMs = lockoutMs * (1L << Math.min(repeats, 10)); // double
-            long maxLockout = 24 * 60 * 60 * 1000L; // 24 hours
-            if (lockoutMs > maxLockout) lockoutMs = maxLockout;
-            record.lockedUntil = System.currentTimeMillis() + lockoutMs;
+            if (lockoutMs > maxLockoutMs) lockoutMs = maxLockoutMs;
+            record.lockedUntil = timeSource.currentTimeMillis() + lockoutMs;
         }
     }
 

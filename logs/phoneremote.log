@@ -63,3 +63,35 @@
 2026-10-11 05:34:52.832 [http-nio-8080-exec-2] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
 2026-10-11 05:34:52.834 [http-nio-8080-exec-2] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
 2026-10-11 05:34:52.836 [http-nio-8080-exec-2] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 2 ms
+2026-10-11 05:54:52.270 [File Watcher] INFO  o.s.b.d.a.LocalDevToolsAutoConfiguration$RestartingClassPathChangeChangedEventListener - Restarting due to 46 class path changes (1 addition, 0 deletions, 45 modifications)
+2026-10-11 05:54:52.413 [restartedMain] INFO  com.phoneremote.App - Starting App using Java 17.0.17 with PID 26640 (F:\phone pc hypnotiser\server\target\classes started by Harsh in F:\phone pc hypnotiser)
+2026-10-11 05:54:52.414 [restartedMain] INFO  com.phoneremote.App - No active profile set, falling back to 1 default profile: "default"
+2026-10-11 05:54:53.057 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-10-11 05:54:53.060 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-11 05:54:53.061 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-10-11 05:54:53.103 [restartedMain] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-11 05:54:53.104 [restartedMain] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 686 ms
+2026-10-11 05:54:53.201 [restartedMain] INFO  c.phoneremote.admin.AdminController - Logging started
+2026-10-11 05:54:53.400 [restartedMain] INFO  o.s.b.d.a.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-10-11 05:54:53.422 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-10-11 05:54:53.428 [restartedMain] INFO  com.phoneremote.App - Started App in 1.072 seconds (process running for 1916.308)
+2026-10-11 05:54:53.431 [restartedMain] INFO  o.s.b.d.a.ConditionEvaluationDeltaLoggingListener - Condition evaluation unchanged
+2026-10-11 05:55:11.827 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-10-11 05:55:11.828 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-10-11 05:55:11.830 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 2 ms
+2026-10-11 05:57:05.357 [restartedMain] INFO  com.phoneremote.App - Starting App using Java 17.0.17 with PID 15616 (F:\phone pc hypnotiser\server\target\classes started by Harsh in F:\phone pc hypnotiser)
+2026-10-11 05:57:05.361 [restartedMain] INFO  com.phoneremote.App - No active profile set, falling back to 1 default profile: "default"
+2026-10-11 05:57:05.444 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-10-11 05:57:05.445 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-10-11 05:57:07.149 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-10-11 05:57:07.168 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-11 05:57:07.169 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.19]
+2026-10-11 05:57:07.259 [restartedMain] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-11 05:57:07.260 [restartedMain] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1813 ms
+2026-10-11 05:57:07.770 [restartedMain] INFO  c.phoneremote.admin.AdminController - Logging started
+2026-10-11 05:57:08.196 [restartedMain] INFO  o.s.b.d.a.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-10-11 05:57:08.250 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-10-11 05:57:08.264 [restartedMain] INFO  com.phoneremote.App - Started App in 3.918 seconds (process running for 4.912)
+2026-10-11 05:57:09.906 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-10-11 05:57:09.907 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-10-11 05:57:09.909 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms

@@ -242,6 +242,257 @@ async function openModule(id) {
     }
 }
 
+let lockoutTimer = null;
+let lockoutAnnounceTimer = null;
+let currentEnteredPin = "";
+
+function renderPinScreen() {
+    currentEnteredPin = "";
+    if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
+    if (lockoutAnnounceTimer) { clearInterval(lockoutAnnounceTimer); lockoutAnnounceTimer = null; }
+
+    showAuthOverlay(`
+        <div id="pin-screen-container" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:320px;">
+            <div id="pin-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+            <h2 id="pin-screen-title" style="font-size:2rem; font-weight:700; margin-bottom:8px;">Enter PIN</h2>
+            <p id="pin-screen-subtitle" style="color:var(--muted); margin-bottom:24px; font-size:0.95rem;">Please enter the 6-digit PIN displayed on your PC.</p>
+            
+            <div id="pin-boxes" style="display:flex; gap:8px; margin-bottom:20px;" aria-label="PIN digits" tabindex="-1">
+                <div class="pin-digit-box" data-idx="0"></div>
+                <div class="pin-digit-box" data-idx="1"></div>
+                <div class="pin-digit-box" data-idx="2"></div>
+                <div class="pin-digit-box" data-idx="3"></div>
+                <div class="pin-digit-box" data-idx="4"></div>
+                <div class="pin-digit-box" data-idx="5"></div>
+            </div>
+
+            <input type="tel" id="pin-input" class="pin-input" maxlength="6" readonly inputmode="none" tabindex="-1" autocomplete="off" style="opacity:0; position:absolute; pointer-events:none; width:1px; height:1px;">
+
+            <div id="pin-keypad" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; width:100%; max-width:280px; margin-top:8px;">
+                <button type="button" class="keypad-btn" data-key="1">1</button>
+                <button type="button" class="keypad-btn" data-key="2">2</button>
+                <button type="button" class="keypad-btn" data-key="3">3</button>
+                <button type="button" class="keypad-btn" data-key="4">4</button>
+                <button type="button" class="keypad-btn" data-key="5">5</button>
+                <button type="button" class="keypad-btn" data-key="6">6</button>
+                <button type="button" class="keypad-btn" data-key="7">7</button>
+                <button type="button" class="keypad-btn" data-key="8">8</button>
+                <button type="button" class="keypad-btn" data-key="9">9</button>
+                <button type="button" class="keypad-btn keypad-aux" data-key="clear">C</button>
+                <button type="button" class="keypad-btn" data-key="0">0</button>
+                <button type="button" class="keypad-btn keypad-aux" data-key="backspace">⌫</button>
+            </div>
+
+            <p id="pin-error" style="color:var(--danger); margin-top:16px; font-weight:600; font-size:0.95rem; display:none;"></p>
+        </div>
+    `);
+
+    updatePinBoxes();
+    setupPinListeners();
+}
+
+function updatePinBoxes() {
+    const boxes = document.querySelectorAll('.pin-digit-box');
+    boxes.forEach((box, i) => {
+        if (i < currentEnteredPin.length) {
+            box.textContent = "•";
+            box.classList.add('filled');
+        } else {
+            box.textContent = "";
+            box.classList.remove('filled');
+        }
+    });
+}
+
+function setupPinListeners() {
+    const hiddenInput = document.getElementById('pin-input');
+    const container = document.getElementById('pin-screen-container');
+
+    const handleDigit = (digit) => {
+        if (currentEnteredPin.length < 6) {
+            currentEnteredPin += digit;
+            updatePinBoxes();
+            if (hiddenInput) hiddenInput.value = currentEnteredPin;
+            if (currentEnteredPin.length === 6) {
+                submitCurrentPin();
+            }
+        }
+    };
+
+    const handleBackspace = () => {
+        if (currentEnteredPin.length > 0) {
+            currentEnteredPin = currentEnteredPin.slice(0, -1);
+            updatePinBoxes();
+            if (hiddenInput) hiddenInput.value = currentEnteredPin;
+        }
+    };
+
+    const handleClear = () => {
+        currentEnteredPin = "";
+        updatePinBoxes();
+        if (hiddenInput) hiddenInput.value = "";
+    };
+
+    document.querySelectorAll('.keypad-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            if (btn.getAttribute('aria-disabled') === 'true') return;
+            const key = btn.dataset.key;
+            if (key === 'backspace') handleBackspace();
+            else if (key === 'clear') handleClear();
+            else if (/^\d$/.test(key)) handleDigit(key);
+        };
+    });
+
+    if (hiddenInput) {
+        hiddenInput.oninput = (e) => {
+            currentEnteredPin = hiddenInput.value.replace(/\D/g, '').slice(0, 6);
+            updatePinBoxes();
+            if (currentEnteredPin.length === 6) {
+                submitCurrentPin();
+            }
+        };
+        hiddenInput.onkeydown = (e) => {
+            if (e.key === 'Backspace') {
+                handleBackspace();
+            }
+        };
+    }
+}
+
+function submitCurrentPin() {
+    if (currentEnteredPin.length === 6 && ws && ws.readyState === WebSocket.OPEN) {
+        let deviceId = localStorage.getItem('pr_device_id') || '';
+        ws.send(JSON.stringify({m: 'core', t: 'pin', d: {pin: currentEnteredPin, deviceId}}));
+    }
+}
+
+function showLockedOutState(retryAfterSeconds) {
+    let container = document.getElementById('pin-screen-container');
+    if (!container) {
+        renderPinScreen();
+        container = document.getElementById('pin-screen-container');
+    }
+
+    if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
+    if (lockoutAnnounceTimer) { clearInterval(lockoutAnnounceTimer); lockoutAnnounceTimer = null; }
+
+    currentEnteredPin = "";
+    updatePinBoxes();
+
+    const hiddenInput = document.getElementById('pin-input');
+    if (hiddenInput) {
+        hiddenInput.disabled = true;
+        hiddenInput.setAttribute('aria-disabled', 'true');
+    }
+
+    const boxesContainer = document.getElementById('pin-boxes');
+    if (boxesContainer) {
+        boxesContainer.classList.add('disabled-control');
+        boxesContainer.setAttribute('aria-disabled', 'true');
+    }
+
+    const keypad = document.getElementById('pin-keypad');
+    if (keypad) {
+        keypad.classList.add('disabled-control');
+        keypad.setAttribute('aria-disabled', 'true');
+        keypad.querySelectorAll('button').forEach(btn => {
+            btn.disabled = true;
+            btn.setAttribute('aria-disabled', 'true');
+        });
+    }
+
+    const err = document.getElementById('pin-error');
+    if (err) {
+        err.style.display = 'block';
+    }
+
+    const liveRegion = document.getElementById('pin-live-region');
+    const startMono = performance.now();
+    const durationMs = (retryAfterSeconds > 0 ? retryAfterSeconds : 1) * 1000;
+    const endMono = startMono + durationMs;
+
+    const formatMSS = (secs) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const totalSeconds = Math.max(1, retryAfterSeconds || 1);
+    let initialText = `Too many wrong tries. Try again in ${formatMSS(totalSeconds)}.`;
+    if (totalSeconds >= 540) {
+        const mins = Math.round(totalSeconds / 60);
+        initialText = `Locked for ${mins} minutes. Too many wrong tries. Try again in ${formatMSS(totalSeconds)}.`;
+    }
+    if (err) err.textContent = initialText;
+    if (liveRegion) liveRegion.textContent = `Account locked. ${initialText}`;
+
+    let lastAnnounce = performance.now();
+
+    const tick = () => {
+        const now = performance.now();
+        const remMs = endMono - now;
+        if (remMs <= 0) {
+            clearInterval(lockoutTimer);
+            lockoutTimer = null;
+            if (lockoutAnnounceTimer) { clearInterval(lockoutAnnounceTimer); lockoutAnnounceTimer = null; }
+            restorePinEntry();
+            return;
+        }
+
+        const remSecs = Math.ceil(remMs / 1000);
+        const txt = `Too many wrong tries. Try again in ${formatMSS(remSecs)}.`;
+        if (err) err.textContent = txt;
+
+        if (now - lastAnnounce >= 60000) {
+            lastAnnounce = now;
+            if (liveRegion) liveRegion.textContent = txt;
+        }
+    };
+
+    lockoutTimer = setInterval(tick, 200);
+}
+
+function restorePinEntry() {
+    currentEnteredPin = "";
+    updatePinBoxes();
+
+    const hiddenInput = document.getElementById('pin-input');
+    if (hiddenInput) {
+        hiddenInput.disabled = false;
+        hiddenInput.removeAttribute('aria-disabled');
+        hiddenInput.value = "";
+    }
+
+    const boxesContainer = document.getElementById('pin-boxes');
+    if (boxesContainer) {
+        boxesContainer.classList.remove('disabled-control');
+        boxesContainer.removeAttribute('aria-disabled');
+        boxesContainer.focus();
+    }
+
+    const keypad = document.getElementById('pin-keypad');
+    if (keypad) {
+        keypad.classList.remove('disabled-control');
+        keypad.removeAttribute('aria-disabled');
+        keypad.querySelectorAll('button').forEach(btn => {
+            btn.disabled = false;
+            btn.removeAttribute('aria-disabled');
+        });
+    }
+
+    const err = document.getElementById('pin-error');
+    if (err) {
+        err.textContent = "";
+        err.style.display = 'none';
+    }
+
+    const liveRegion = document.getElementById('pin-live-region');
+    if (liveRegion) {
+        liveRegion.textContent = "Lockout ended. You may now enter your PIN.";
+    }
+}
+
 function connect() {
     updateStatus('reconnecting', 'Connecting...');
     
@@ -273,32 +524,7 @@ function connect() {
         
         if (msg.m === 'core') {
             if (msg.t === 'need_pin') {
-                showAuthOverlay(`
-                    <h2 style="font-size:2rem; font-weight:700; margin-bottom:12px;">Enter PIN</h2>
-                    <p style="color:var(--muted); margin-bottom:32px;">Please enter the 6-digit PIN displayed on your PC.</p>
-                    <input type="tel" id="pin-input" class="pin-input" maxlength="6" placeholder="••••••">
-                    <button id="pin-submit" style="margin-top:24px; width:80%; max-width:300px; padding:18px; font-size:1.2rem; font-weight:700; border-radius:16px; background:white; color:black; border:none; box-shadow:0 8px 24px rgba(255,255,255,0.2);">Connect</button>
-                    <p id="pin-error" style="color:var(--danger); margin-top:20px; font-weight:600; display:none;"></p>
-                `);
-                
-                const pinInput = document.getElementById('pin-input');
-                pinInput.focus();
-                
-                const submitPin = () => {
-                    const pin = pinInput.value;
-                    if (pin.length === 6) {
-                        let deviceId = localStorage.getItem('pr_device_id') || '';
-                        ws.send(JSON.stringify({m: 'core', t: 'pin', d: {pin, deviceId}}));
-                    } else {
-                        document.getElementById('pin-error').textContent = 'PIN must be 6 digits';
-                        document.getElementById('pin-error').style.display = 'block';
-                    }
-                };
-                
-                document.getElementById('pin-submit').onclick = submitPin;
-                pinInput.onkeyup = (e) => {
-                    if (e.key === 'Enter') submitPin();
-                };
+                renderPinScreen();
             } else if (msg.t === 'pending_approval') {
                 showAuthOverlay(`<svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--accent)" stroke-width="2" fill="none" style="margin-bottom:20px; animation: jiggle 2s infinite;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <h2 style="font-size:1.5rem; font-weight:600; margin-bottom:12px;">Waiting for approval...</h2><p style="color:var(--muted);">Please accept the connection on your PC.</p>`);
@@ -316,12 +542,18 @@ function connect() {
                     }
                 }));
             } else if (msg.t === 'error') {
-                if (msg.d.type === 'bad_pin') {
+                if (msg.d && (msg.d.type === 'bad_pin' || msg.d.code === 'bad_pin')) {
+                    currentEnteredPin = "";
+                    updatePinBoxes();
                     const err = document.getElementById('pin-error');
                     if (err) { err.textContent = 'Incorrect PIN'; err.style.display = 'block'; }
-                } else if (msg.d.type === 'locked_out') {
-                    showAuthOverlay(`<svg viewBox="0 0 24 24" width="64" height="64" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:20px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        <h2 style="font-size:2rem; font-weight:700; color:var(--danger); margin-bottom:12px;">Locked Out</h2><p style="color:var(--muted); font-size:1.1rem;">Too many attempts. Try again later.</p>`);
+                    const hiddenInput = document.getElementById('pin-input');
+                    if (hiddenInput) { hiddenInput.value = ""; }
+                    const boxesContainer = document.getElementById('pin-boxes');
+                    if (boxesContainer) { boxesContainer.focus(); }
+                } else if (msg.d && (msg.d.type === 'locked_out' || msg.d.code === 'locked_out')) {
+                    const retryAfter = msg.d.retryAfterSeconds !== undefined ? msg.d.retryAfterSeconds : 300;
+                    showLockedOutState(retryAfter);
                 } else if (msg.d && (msg.d.type === 'revoked' || msg.d.code === 'revoked')) {
                     isRevoked = true;
                     cleanup();

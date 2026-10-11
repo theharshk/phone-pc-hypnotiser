@@ -15,6 +15,7 @@ F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\ScreenModule.
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\ws\RemoteSocketHandler.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\ModuleRegistry.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\impl\TouchpadModule.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\ws\TimeSource.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\logging\InMemoryLogAppender.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\InputAdapter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\impl\MediaModule.java
