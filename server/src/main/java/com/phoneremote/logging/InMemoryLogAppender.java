@@ -12,9 +12,18 @@ public class InMemoryLogAppender extends AppenderBase<ILoggingEvent> {
     private static final ConcurrentLinkedDeque<ILoggingEvent> events = new ConcurrentLinkedDeque<>();
 
     @Override
+    public synchronized void doAppend(ILoggingEvent eventObject) {
+        append(eventObject);
+    }
+
+    @Override
     protected void append(ILoggingEvent eventObject) {
-        // Must explicitly prepare for deferred processing so message is formatted if params are present
-        eventObject.prepareForDeferredProcessing();
+        if (eventObject == null) return;
+        try {
+            eventObject.prepareForDeferredProcessing();
+        } catch (Throwable ignored) {
+            // In unit tests or uninitialized logback environments, MDC adapter might not be present
+        }
         events.addLast(eventObject);
         while (events.size() > MAX_SIZE) {
             events.pollFirst();
@@ -23,5 +32,9 @@ public class InMemoryLogAppender extends AppenderBase<ILoggingEvent> {
 
     public static List<ILoggingEvent> getEvents() {
         return new ArrayList<>(events);
+    }
+
+    public static void clear() {
+        events.clear();
     }
 }

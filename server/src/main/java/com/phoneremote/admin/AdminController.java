@@ -271,6 +271,15 @@ public class AdminController {
         res.set("devices", devicesNode);
         
         com.fasterxml.jackson.databind.node.ArrayNode pendingNode = om.createArrayNode();
+        if (socketHandler != null) {
+            for (com.phoneremote.ws.RemoteSocketHandler.PendingApproval p : socketHandler.getPendingApprovals()) {
+                com.fasterxml.jackson.databind.node.ObjectNode pNode = om.createObjectNode();
+                pNode.put("deviceId", escapeHtml(p.deviceId));
+                pNode.put("name", escapeHtml(p.deviceName));
+                pNode.put("ip", escapeHtml(p.ip));
+                pendingNode.add(pNode);
+            }
+        }
         res.set("pending", pendingNode);
         
         com.phoneremote.module.ScreenStats.Averages stats = com.phoneremote.module.ScreenModule.globalStats.getAverages();
@@ -321,4 +330,34 @@ public class AdminController {
         response.setHeader("Content-Disposition", "attachment; filename=\"phoneremote.log\"");
         java.nio.file.Files.copy(logFile.toPath(), response.getOutputStream());
         response.getOutputStream().flush();
-    }}
+    }
+
+    @PostMapping(value = "/approve", produces = "application/json")
+    @ResponseBody
+    public String handleApprove(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!checkAccess(request, response)) return null;
+        if (!verifyCsrfAndOrigin(request)) {
+            response.setStatus(403);
+            return "{\"success\":false,\"error\":\"CSRF or Origin invalid\"}";
+        }
+        String deviceId = request.getParameter("deviceId");
+        String action = request.getParameter("action");
+        if (deviceId == null || action == null) {
+            response.setStatus(400);
+            return "{\"success\":false,\"error\":\"Missing parameters\"}";
+        }
+        if ("approve".equals(action)) {
+            if (socketHandler != null) {
+                socketHandler.approvePendingDevice(deviceId);
+            }
+            return "{\"success\":true}";
+        } else if ("reject".equals(action)) {
+            if (socketHandler != null) {
+                socketHandler.rejectPendingDevice(deviceId);
+            }
+            return "{\"success\":true}";
+        }
+        response.setStatus(400);
+        return "{\"success\":false,\"error\":\"Invalid action\"}";
+    }
+}

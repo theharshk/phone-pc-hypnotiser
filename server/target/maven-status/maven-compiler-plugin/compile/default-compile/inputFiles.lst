@@ -1,9 +1,11 @@
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\ScreenStats.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\MouseButton.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\ws\Session.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\util\CommandRunner.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\PowerAction.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\PowerAdapter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\windows\RobotInputAdapter.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\tray\TrayManager.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\fake\FakeScreenAdapter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\MediaKey.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\App.java
@@ -16,6 +18,7 @@ F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\ws\RemoteSocketHandl
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\ModuleRegistry.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\impl\TouchpadModule.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\ws\TimeSource.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\startup\StartupReporter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\logging\InMemoryLogAppender.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\InputAdapter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\impl\MediaModule.java
@@ -24,9 +27,12 @@ F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\ws\LockoutTracker.ja
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\config\ConfigStore.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\impl\KeyboardModule.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\config\AppConfig.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\util\ProcessCommandRunner.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\module\RemoteModule.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\admin\AdminController.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\util\NetworkUtil.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\fake\FakeInputAdapter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\ScreenAdapter.java
+F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\autostart\AutoStartManager.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\windows\WindowsScreenAdapter.java
 F:\phone pc hypnotiser\server\src\main\java\com\phoneremote\adapter\windows\WindowsPowerAdapter.java

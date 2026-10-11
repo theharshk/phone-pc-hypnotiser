@@ -1,8 +1,10 @@
 com\phoneremote\screen\ScreenTests.class
+com\phoneremote\admin\AdminLogsTest.class
+com\phoneremote\step8\Step8Tests$FakeCommandRunner.class
+com\phoneremote\step8\Step8Tests.class
 com\phoneremote\host\LayoutTests$1.class
 com\phoneremote\module\impl\PowerModuleTest.class
 com\phoneremote\module\impl\TouchpadModuleTest.class
-com\phoneremote\admin\AdminLogsTest.class
 com\phoneremote\module\impl\MediaModuleTest.class
 com\phoneremote\module\impl\PowerModuleTest$1.class
 com\phoneremote\host\LayoutTests.class

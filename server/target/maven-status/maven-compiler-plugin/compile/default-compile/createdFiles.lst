@@ -1,1 +1,9 @@
+com\phoneremote\autostart\AutoStartManager.class
 com\phoneremote\ws\TimeSource.class
+com\phoneremote\startup\StartupReporter.class
+com\phoneremote\util\CommandRunner.class
+com\phoneremote\terminal\TerminalWizard.class
+com\phoneremote\tray\TrayManager.class
+com\phoneremote\util\ProcessCommandRunner.class
+com\phoneremote\ws\RemoteSocketHandler$PendingApproval.class
+com\phoneremote\util\NetworkUtil.class

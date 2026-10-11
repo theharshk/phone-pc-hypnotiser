@@ -91,6 +91,10 @@ public class ConfigStore {
         }
     }
 
+    public boolean hasConfigFile() {
+        return Files.exists(configPath);
+    }
+
     public boolean isPinSet() {
         lock.readLock().lock();
         try {

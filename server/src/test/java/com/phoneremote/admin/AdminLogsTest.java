@@ -21,19 +21,29 @@ class AdminLogsTest {
 
     @BeforeEach
     void setUp() {
+        InMemoryLogAppender.clear();
         controller = new AdminController(null, null, null);
         controller.initLogging();
+
+        LoggerContext lc = (LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory();
+        if (lc.getLogger("com.phoneremote.frames").getAppender("ASYNC_FRAME_FILE") == null) {
+            try {
+                ch.qos.logback.classic.joran.JoranConfigurator configurator = new ch.qos.logback.classic.joran.JoranConfigurator();
+                configurator.setContext(lc);
+                configurator.doConfigure(getClass().getResourceAsStream("/logback-spring.xml"));
+            } catch (Exception ignored) {}
+        }
     }
 
     @Test
     void testRingBufferSizeLimit() {
-        InMemoryLogAppender appender = new InMemoryLogAppender();
         LoggerContext lc = new LoggerContext();
+        InMemoryLogAppender appender = new InMemoryLogAppender();
+        appender.setContext(lc);
+        appender.start();
+        ch.qos.logback.classic.Logger logger = lc.getLogger("test");
         for (int i = 0; i < 600; i++) {
-            LoggingEvent event = new LoggingEvent();
-            event.setLevel(Level.INFO);
-            event.setMessage("Message " + i);
-            event.setLoggerContext(lc);
+            LoggingEvent event = new LoggingEvent("test", logger, Level.INFO, "Message " + i, null, null);
             appender.doAppend(event);
         }
         
@@ -44,12 +54,12 @@ class AdminLogsTest {
 
     @Test
     void testLogFilteringAndHtmlEscaping() throws Exception {
-        InMemoryLogAppender appender = new InMemoryLogAppender();
         LoggerContext lc = new LoggerContext();
-        LoggingEvent event = new LoggingEvent();
-        event.setLevel(Level.INFO);
-        event.setMessage("Test <script>alert(1)</script>");
-        event.setLoggerContext(lc);
+        InMemoryLogAppender appender = new InMemoryLogAppender();
+        appender.setContext(lc);
+        appender.start();
+        ch.qos.logback.classic.Logger logger = lc.getLogger("test");
+        LoggingEvent event = new LoggingEvent("test", logger, Level.INFO, "Test <script>alert(1)</script>", null, null);
         appender.doAppend(event);
 
         MockHttpServletRequest req = new MockHttpServletRequest();

@@ -39,3 +39,61 @@ This document tracks the errors we encountered during the development of Phone R
 2. **Active Push Revocation:** In `AdminController.handleRevoke`, after removing the device from `ConfigStore`, the server calls `socketHandler.revokeDevice(deviceId)` (or `revokeAllDevices()`). For each open session, it sends `{"m":"core","t":"error","d":{"code":"revoked"}}`, calls `module.onClose(session)` to release input keys and stop screen capture pipelines, marks `session.setAuthenticated(false)`, and closes the socket.
 3. **Heartbeat Safety Net:** Added a verification check on every `"ping"` message: if the session is authenticated but its device record no longer exists in `ConfigStore`, the server triggers the immediate revocation teardown.
 4. **Client Terminal State:** Updated `web/host.js` so that receiving `"revoked"` sets `isRevoked = true`, cleans up active modules, clears stored tokens, presents the revoked overlay, and inhibits the auto-reconnect logic.
+
+## 7. Missing `web/admin/index.html` (IDE Working Directory Mismatch)
+**Error:** Visiting `http://localhost:8080/admin` returned `"Missing web/admin/index.html"` or a 404 response.
+**Why it happened:** In `AdminController.java`, the static SPA template was being loaded from disk via `new File("web/admin/index.html")`. When launched from certain IDE configurations or runner scripts, the process working directory was set to the `server/` module subdirectory instead of the repository root (`F:\phone pc hypnotiser`), causing `web/admin/index.html` to not resolve.
+**Fix:** Implemented a resilient fallback path lookup in `renderSPA`:
+```java
+File f = new File("web/admin/index.html");
+if (!f.exists()) {
+    f = new File("../web/admin/index.html");
+}
+```
+
+## 8. Admin Dashboard UTF-8 Mojibake on Security PIN Dots (`â€¢`)
+**Error:** In the Admin Panel security settings card, masked PIN bullets appeared corrupted as `â€¢â€¢â€¢â€¢â€¢â€¢` instead of `••••••`.
+**Why it happened:** `AdminController.java` read `index.html` bytes into a String without specifying a character encoding (`new String(Files.readAllBytes(...))`), causing the JVM to decode UTF-8 bytes using the Windows system default encoding (Windows-1252). Additionally, Spring `@GetMapping` endpoints defaulted to standard `text/html` without an explicit UTF-8 charset declaration in the `Content-Type` header, causing browser decoding mismatch.
+**Fix:** Specified `StandardCharsets.UTF_8` explicitly when reading bytes to String, and added `produces = "text/html;charset=UTF-8"` to all HTML-serving endpoints in `AdminController.java`.
+
+## 9. Phone UI Status Dot Glow Clipping & Visibility in Light Mode
+**Error:** The green connection status dot on the mobile web interface appeared clipped with a flat edge and did not show a visible glow or flare in light mode.
+**Why it happened:** 
+1. The parent container `.status-line` had height and overflow constraints that clipped the outer radial `box-shadow` blur spread.
+2. Light mode theme variables had insufficient alpha contrast for the emerald glow against light backgrounds (`#E8EBF0`).
+**Fix:** Added `overflow: visible` to `.status-line` in `web/style.css`, and configured a multi-layered radial box-shadow with distinct RGBA color stops for both light and dark themes to ensure an unclipped, luminous pulse flare.
+
+## 10. `NullPointerException` on `MDCAdapter` in `InMemoryLogAppender`
+**Error:**
+```text
+java.lang.NullPointerException: Cannot invoke "org.slf4j.spi.MDCAdapter.getCopyOfContextMap()" because "mdcAdapter" is null
+    at ch.qos.logback.classic.spi.LoggingEvent.getMDCPropertyMap(LoggingEvent.java:411)
+    at ch.qos.logback.classic.spi.LoggingEvent.prepareForDeferredProcessing(LoggingEvent.java:255)
+    at com.phoneremote.logging.InMemoryLogAppender.append(InMemoryLogAppender.java:23)
+```
+**Why it happened:** In `InMemoryLogAppender.append()`, calling `eventObject.prepareForDeferredProcessing()` directly accesses `mdcAdapter` on the event. In isolated unit tests (such as `AdminLogsTest`) where synthetic `LoggingEvent` instances were constructed manually without an active SLF4J MDC context, `mdcAdapter` was null. Logback's `AppenderBase.doAppend()` swallowed the NPE, silently dropping mock events from the in-memory ring buffer and causing unit test assertions to fail.
+**Fix:** Wrapped `eventObject.prepareForDeferredProcessing()` in a `try-catch (Throwable ignored)` block and overrode `public synchronized void doAppend(ILoggingEvent eventObject) { append(eventObject); }` so test-injected events bypass Logback's uninitialized context checks and append reliably.
+
+## 11. Missing `isOpen()` Delegate on Session Wrapper
+**Error:**
+```text
+[ERROR] RemoteSocketHandler.java:[76,35] cannot find symbol
+  symbol:   method isOpen()
+  location: variable session of type com.phoneremote.ws.Session
+```
+**Why it happened:** `RemoteSocketHandler` wraps Spring's `WebSocketSession` inside an internal `Session` class (handling single-threaded executors and attributes). When adding approval and revocation methods that check whether a socket is still active before sending messages, `session.isOpen()` was called, but the custom `Session` class did not expose an `isOpen()` delegate method for its underlying `WebSocketSession`.
+**Fix:** Added `public boolean isOpen() { return wsSession.isOpen(); }` to `Session.java`.
+
+## 12. Spring Boot `BeanCreationException`: `No default constructor found` on Multi-Constructor Beans
+**Error:**
+```text
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'autoStartManager': 
+Failed to instantiate [com.phoneremote.autostart.AutoStartManager]: No default constructor found
+Caused by: java.lang.NoSuchMethodException: com.phoneremote.autostart.AutoStartManager.<init>()
+```
+**Why it happened:** `AutoStartManager` declared two constructors:
+- `public AutoStartManager(CommandRunner commandRunner)` (intended for production Spring injection)
+- `public AutoStartManager(CommandRunner commandRunner, String workingDir)` (overload for unit tests with custom directories)
+
+In Spring Boot, when a `@Component` class declares multiple constructors and none are annotated with `@Autowired`, Spring cannot infer which constructor to use for dependency injection and falls back to looking for a no-argument constructor `AutoStartManager()`. Because no zero-arg constructor existed, Spring aborted initialization.
+**Fix:** Added `@Autowired` to the primary constructor in `AutoStartManager.java` (and `TerminalWizard.java`) to explicitly guide Spring's constructor injection.

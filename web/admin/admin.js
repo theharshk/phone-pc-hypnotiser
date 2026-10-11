@@ -1,6 +1,127 @@
 // Handle CSRF for POSTs
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+const pendingTimestamps = {};
+
+async function approveDevice(deviceId, name) {
+    await postAction('/admin/approve', { deviceId: deviceId, action: 'approve' });
+    showToast(`Approved ${name}`, 'success');
+}
+
+async function denyDevice(deviceId, name) {
+    await postAction('/admin/approve', { deviceId: deviceId, action: 'reject' });
+    showToast(`Denied ${name}`, 'info');
+}
+
+function updatePendingUI(data) {
+    // A PIN-set server shows nothing extra: no badge, no banner, no block
+    const pendingList = (!data.pinSet && Array.isArray(data.pending)) ? data.pending : [];
+    const count = pendingList.length;
+
+    // 1. Count badge on Devices sidebar item & page title
+    const badge = document.getElementById('devicesBadge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    document.title = count > 0 ? `(${count}) Admin` : 'Phone Remote Admin';
+
+    // 2. Overview slim banner
+    const banner = document.getElementById('overviewPendingBanner');
+    const bannerText = document.getElementById('overviewPendingText');
+    if (banner && bannerText) {
+        if (count > 0) {
+            const noun = count === 1 ? 'device' : 'devices';
+            bannerText.textContent = `${count} ${noun} waiting for approval`;
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    // 3. Devices page "Pending approval" block
+    renderPendingApprovals(pendingList);
+}
+
+function renderPendingApprovals(pending) {
+    const container = document.getElementById('pendingApprovalsContainer');
+    if (!container) return;
+
+    if (!pending || pending.length === 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+
+    // Clean up timestamps of resolved devices
+    const currentIds = new Set(pending.map(p => p.deviceId));
+    for (let id in pendingTimestamps) {
+        if (!currentIds.has(id)) delete pendingTimestamps[id];
+    }
+
+    let phtml = `
+        <div style="background: rgba(47,91,255,0.04); border: 1px solid rgba(47,91,255,0.18); border-radius: var(--radius-inner); padding: 20px; margin-bottom: 28px;">
+            <div style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--accent)" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Pending approval
+            </div>
+            <div class="table-container">
+                <table class="data-table" style="background: transparent;">
+                    <thead>
+                        <tr>
+                            <th>Device</th>
+                            <th>Time Asked</th>
+                            <th>IP</th>
+                            <th style="text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    pending.forEach(p => {
+        if (!pendingTimestamps[p.deviceId]) {
+            pendingTimestamps[p.deviceId] = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        const timeAsked = p.timeAsked || p.created ? new Date(p.timeAsked || p.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : pendingTimestamps[p.deviceId];
+
+        phtml += `
+            <tr>
+                <td><strong>${escapeHtml(p.name || 'Unknown Device')}</strong></td>
+                <td class="mono" style="color: var(--muted);">${escapeHtml(timeAsked)}</td>
+                <td class="mono" style="color: var(--muted);">${escapeHtml(p.ip || '—')}</td>
+                <td style="text-align: right; white-space: nowrap;">
+                    <button class="btn btn-primary" onclick="approveDevice('${escapeHtml(p.deviceId)}', '${escapeHtml(p.name || 'Device')}')">Approve</button>
+                    <button class="btn btn-outline" style="margin-left: 8px;" onclick="denyDevice('${escapeHtml(p.deviceId)}', '${escapeHtml(p.name || 'Device')}')">Deny</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    phtml += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = phtml;
+    container.style.display = 'block';
+}
+
 // Navigation
 document.querySelectorAll('.nav-item').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -36,7 +157,8 @@ async function fetchState() {
         historyEnc.shift(); historyEnc.push(data.stats.encodeMs || 0);
 
         renderOverview(data);
-        renderDevices(data.devices, data.pending);
+        renderDevices(data.devices);
+        updatePendingUI(data);
         renderFrameLogs(data);
         
         // Sync security checkboxes if they aren't currently focused
@@ -177,37 +299,12 @@ function renderOverview(data) {
 
 
 
-function renderDevices(devices, pending) {
+function renderDevices(devices) {
     const tbody = document.querySelector('#devicesTable tbody');
     if (!tbody) return;
-    
-    // Handle Pending
-    const pendingContainer = document.getElementById('pendingApprovalsContainer');
-    if (pendingContainer) {
-        if (pending.length > 0) {
-            let phtml = `<div style="background:rgba(229,48,58,0.05); padding:16px; border-radius:var(--radius-inner); margin-bottom:24px; border: 1px solid rgba(229,48,58,0.1);">
-                <div style="font-weight:600; margin-bottom:12px; color:var(--danger)">Pending Approvals</div>
-                <table class="data-table"><tbody>`;
-            pending.forEach(p => {
-                phtml += `<tr>
-                    <td><strong>${p.name}</strong> <span class="mono" style="color:var(--muted); margin-left:8px;">${p.ip}</span></td>
-                    <td style="text-align:right">
-                        <button class="btn btn-black" onclick="postAction('/admin/approve', {deviceId: '${p.deviceId}', action: 'approve'})">Approve</button>
-                        <button class="btn btn-outline" style="margin-left:8px;" onclick="postAction('/admin/approve', {deviceId: '${p.deviceId}', action: 'reject'})">Deny</button>
-                    </td>
-                </tr>`;
-            });
-            phtml += `</tbody></table></div>`;
-            pendingContainer.innerHTML = phtml;
-            pendingContainer.style.display = 'block';
-        } else {
-            pendingContainer.innerHTML = '';
-            pendingContainer.style.display = 'none';
-        }
-    }
 
     // Handle Paired
-    if (devices.length === 0) {
+    if (!devices || devices.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px;">No devices paired. Connect your phone to get started.</td></tr>`;
         return;
     }
@@ -341,9 +438,36 @@ setInterval(() => {
     }
 }, 1000);
 
+// Visibility-aware 3-second state polling
+let statePollInterval = null;
+
+function startStatePolling() {
+    if (!statePollInterval) {
+        statePollInterval = setInterval(fetchState, 3000);
+    }
+}
+
+function stopStatePolling() {
+    if (statePollInterval) {
+        clearInterval(statePollInterval);
+        statePollInterval = null;
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopStatePolling();
+    } else {
+        fetchState();
+        startStatePolling();
+    }
+});
+
 // Init
-setInterval(fetchState, 1000);
 fetchState();
+if (!document.hidden) {
+    startStatePolling();
+}
 setInterval(() => fetchLogs(false), 3000);
 fetchLogs(true);
 

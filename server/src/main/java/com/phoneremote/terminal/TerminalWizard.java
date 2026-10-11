@@ -5,6 +5,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 @Component
@@ -12,15 +14,31 @@ public class TerminalWizard implements CommandLineRunner {
 
     private final ConfigStore configStore;
     private final TerminalPromptService promptService;
+    private final BooleanSupplier consoleChecker;
+    private final Consumer<Integer> exitHandler;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public TerminalWizard(ConfigStore configStore, TerminalPromptService promptService) {
+        this(configStore, promptService, () -> System.console() != null, System::exit);
+    }
+
+    public TerminalWizard(ConfigStore configStore, TerminalPromptService promptService,
+                          BooleanSupplier consoleChecker, Consumer<Integer> exitHandler) {
         this.configStore = configStore;
         this.promptService = promptService;
+        this.consoleChecker = consoleChecker;
+        this.exitHandler = exitHandler;
     }
 
     @Override
     public void run(String... args) throws Exception {
-        if (!configStore.isPinSet() && configStore.getDevices().isEmpty()) {
+        if (!configStore.hasConfigFile()) {
+            if (!consoleChecker.getAsBoolean()) {
+                System.err.println("Run once from a terminal to set a PIN");
+                exitHandler.accept(1);
+                return;
+            }
+
             System.out.println("\n=== Phone Remote First Run ===");
             while (true) {
                 CompletableFuture<String> future = promptService.prompt("Set a 6-digit PIN? (recommended) [y/n]:");
@@ -38,8 +56,9 @@ public class TerminalWizard implements CommandLineRunner {
                     }
                     break;
                 } else if ("n".equals(ans) || "no".equals(ans)) {
+                    configStore.setPin(null);
                     System.out.println("\nWARNING: No PIN set. Anyone on your local WiFi can request to control your PC.");
-                    System.out.println("You will have to approve each device manually from this terminal.\n");
+                    System.out.println("You will have to approve each device manually from the admin page or terminal.\n");
                     break;
                 }
             }

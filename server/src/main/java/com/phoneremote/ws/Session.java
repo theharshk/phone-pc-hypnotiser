@@ -27,6 +27,7 @@ public class Session {
     public String getDeviceId() { return deviceId; }
     public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
 
+    public boolean isOpen() { return wsSession.isOpen(); }
     public String getId() {
         return wsSession.getId();
     }

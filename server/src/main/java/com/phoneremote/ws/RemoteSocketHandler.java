@@ -33,8 +33,82 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
 
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final Map<String, java.util.Set<Session>> deviceSessions = new ConcurrentHashMap<>();
+    private final Map<String, PendingApproval> pendingApprovals = new ConcurrentHashMap<>();
     private final Timer authTimer = new Timer(true);
     private static final int MAX_PAYLOAD_LENGTH = 8192;
+    private volatile boolean remoteControlEnabled = true;
+
+    public static class PendingApproval {
+        public final String deviceId;
+        public final String deviceName;
+        public final String ip;
+        public final Session session;
+
+        public PendingApproval(String deviceId, String deviceName, String ip, Session session) {
+            this.deviceId = deviceId;
+            this.deviceName = deviceName;
+            this.ip = ip;
+            this.session = session;
+        }
+    }
+
+    public boolean isRemoteControlEnabled() {
+        return remoteControlEnabled;
+    }
+
+    public void setRemoteControlEnabled(boolean enabled) {
+        this.remoteControlEnabled = enabled;
+        if (!enabled) {
+            java.util.List<Session> all = new java.util.ArrayList<>(sessions.values());
+            for (Session s : all) {
+                revokeSession(s);
+            }
+            pendingApprovals.clear();
+        }
+    }
+
+    public java.util.Collection<PendingApproval> getPendingApprovals() {
+        return pendingApprovals.values();
+    }
+
+    public boolean approvePendingDevice(String deviceId) {
+        PendingApproval p = pendingApprovals.remove(deviceId);
+        if (p != null && p.session.isOpen()) {
+            try {
+                pairDevice(p.session, p.deviceId, p.deviceName, p.ip);
+                return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    public boolean rejectPendingDevice(String deviceId) {
+        PendingApproval p = pendingApprovals.remove(deviceId);
+        if (p != null && p.session.isOpen()) {
+            try {
+                sendError(p.session, "revoked");
+                p.session.close();
+                return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    public void cleanShutdown() {
+        for (Session s : new java.util.ArrayList<>(sessions.values())) {
+            for (RemoteModule m : moduleRegistry.getAll()) {
+                try {
+                    m.onClose(s);
+                } catch (Exception ignored) {}
+            }
+            try {
+                s.close();
+            } catch (Exception ignored) {}
+        }
+        sessions.clear();
+        deviceSessions.clear();
+        pendingApprovals.clear();
+    }
 
     public int getActiveSessionCount() {
         return (int) sessions.values().stream().filter(Session::isAuthenticated).count();
@@ -67,6 +141,10 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession wsSession) throws Exception {
+        if (!remoteControlEnabled) {
+            wsSession.close();
+            return;
+        }
         Session session = new Session(wsSession);
         sessions.put(wsSession.getId(), session);
 
@@ -82,6 +160,10 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession wsSession, TextMessage message) throws Exception {
+        if (!remoteControlEnabled) {
+            wsSession.close();
+            return;
+        }
         String payload = message.getPayload();
         if (payload.length() > MAX_PAYLOAD_LENGTH) {
             wsSession.close(CloseStatus.BAD_DATA.withReason("Message too large"));
@@ -157,9 +239,16 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                     response.put("t", "need_pin");
                     session.send(mapper.writeValueAsString(response));
                 } else {
-                    // Open mode auto-pair
+                    // No-PIN mode: requires approval on laptop (Admin page)
                     String finalDeviceId = deviceId.isEmpty() ? UUID.randomUUID().toString() : deviceId;
-                    pairDevice(session, finalDeviceId, deviceName, ip);
+                    session.setAttribute("pendingDeviceId", finalDeviceId);
+                    PendingApproval pending = new PendingApproval(finalDeviceId, deviceName, ip, session);
+                    pendingApprovals.put(finalDeviceId, pending);
+
+                    ObjectNode response = mapper.createObjectNode();
+                    response.put("m", "core");
+                    response.put("t", "pending_approval");
+                    session.send(mapper.writeValueAsString(response));
                 }
             }
         } else if ("pin".equals(t)) {
@@ -410,6 +499,10 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession wsSession, CloseStatus status) throws Exception {
         Session session = sessions.remove(wsSession.getId());
         if (session != null) {
+            String pendingDevId = (String) session.getAttribute("pendingDeviceId");
+            if (pendingDevId != null) {
+                pendingApprovals.remove(pendingDevId);
+            }
             unregisterDeviceSession(session.getDeviceId(), session);
             if (session.isAuthenticated()) {
                 for (RemoteModule module : moduleRegistry.getAll()) {
