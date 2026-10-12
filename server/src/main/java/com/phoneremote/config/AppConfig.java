@@ -46,24 +46,31 @@ public class AppConfig implements WebMvcConfigurer, WebSocketConfigurer {
         registry.addViewController("/").setViewName("forward:/index.html");
     }
 
+    public static boolean validateOrigin(String origin, String hostHeader) {
+        if (origin == null) {
+            return true; // Documented rule: missing Origin is allowed for non-browser/direct clients
+        }
+        try {
+            java.net.URI originUri = new java.net.URI(origin);
+            if (hostHeader != null) {
+                String originAuthority = originUri.getAuthority();
+                return hostHeader.equals(originAuthority);
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(remoteSocketHandler, "/ws")
                 .addInterceptors(new org.springframework.web.socket.server.HandshakeInterceptor() {
                     @Override
-                    public boolean beforeHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, WebSocketHandler wsHandler, java.util.Map<String, Object> attributes) throws Exception {
+                    public boolean beforeHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, WebSocketHandler wsHandler, java.util.Map<String, Object> attributes) {
                         String origin = request.getHeaders().getOrigin();
-                        if (origin != null) {
-                            java.net.URI originUri = new java.net.URI(origin);
-                            String hostHeader = request.getHeaders().getFirst("Host");
-                            if (hostHeader != null) {
-                                String originAuthority = originUri.getAuthority();
-                                if (!hostHeader.equals(originAuthority)) {
-                                    return false;
-                                }
-                            }
-                        }
-                        return true;
+                        String hostHeader = request.getHeaders().getFirst("Host");
+                        return validateOrigin(origin, hostHeader);
                     }
                     @Override
                     public void afterHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, WebSocketHandler wsHandler, Exception exception) {}

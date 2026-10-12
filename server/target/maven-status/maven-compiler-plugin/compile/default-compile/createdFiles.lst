@@ -1,7 +1,6 @@
 com\phoneremote\autostart\AutoStartManager.class
 com\phoneremote\module\impl\MediaModule.class
 com\phoneremote\ws\LockoutTracker$StrikeRecord.class
-com\phoneremote\module\impl\PowerModule$1.class
 com\phoneremote\module\ScreenStats.class
 com\phoneremote\module\ModuleRegistry.class
 com\phoneremote\module\ScreenModule.class

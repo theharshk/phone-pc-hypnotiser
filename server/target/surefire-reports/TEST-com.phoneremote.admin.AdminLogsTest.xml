@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.phoneremote.admin.AdminLogsTest" time="2.996" tests="6" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.phoneremote.admin.AdminLogsTest" time="3.942" tests="6" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="17"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -15,7 +15,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="US"/>
     <property name="sun.boot.library.path" value="C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot\bin"/>
-    <property name="sun.java.command" value="C:\Users\Harsh\AppData\Local\Temp\surefire16760870122858174634\surefirebooter-20261012135644728_3.jar C:\Users\Harsh\AppData\Local\Temp\surefire16760870122858174634 2026-10-12T13-56-44_371-jvmRun1 surefire-20261012135644728_1tmp surefire_0-20261012135644728_2tmp"/>
+    <property name="sun.java.command" value="C:\Users\Harsh\AppData\Local\Temp\surefire7099089819539113288\surefirebooter-20261012154131414_3.jar C:\Users\Harsh\AppData\Local\Temp\surefire7099089819539113288 2026-10-12T15-41-30_990-jvmRun1 surefire-20261012154131414_1tmp surefire_0-20261012154131414_2tmp"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="F:\phone pc hypnotiser\server\target\test-classes;F:\phone pc hypnotiser\server\target\classes;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter-web\3.2.4\spring-boot-starter-web-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter\3.2.4\spring-boot-starter-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter-logging\3.2.4\spring-boot-starter-logging-3.2.4.jar;C:\Users\Harsh\.m2\repository\ch\qos\logback\logback-classic\1.4.14\logback-classic-1.4.14.jar;C:\Users\Harsh\.m2\repository\ch\qos\logback\logback-core\1.4.14\logback-core-1.4.14.jar;C:\Users\Harsh\.m2\repository\org\apache\logging\log4j\log4j-to-slf4j\2.21.1\log4j-to-slf4j-2.21.1.jar;C:\Users\Harsh\.m2\repository\org\apache\logging\log4j\log4j-api\2.21.1\log4j-api-2.21.1.jar;C:\Users\Harsh\.m2\repository\org\slf4j\jul-to-slf4j\2.0.12\jul-to-slf4j-2.0.12.jar;C:\Users\Harsh\.m2\repository\jakarta\annotation\jakarta.annotation-api\2.1.1\jakarta.annotation-api-2.1.1.jar;C:\Users\Harsh\.m2\repository\org\yaml\snakeyaml\2.2\snakeyaml-2.2.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter-json\3.2.4\spring-boot-starter-json-3.2.4.jar;C:\Users\Harsh\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.15.4\jackson-databind-2.15.4.jar;C:\Users\Harsh\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.15.4\jackson-annotations-2.15.4.jar;C:\Users\Harsh\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.15.4\jackson-core-2.15.4.jar;C:\Users\Harsh\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jdk8\2.15.4\jackson-datatype-jdk8-2.15.4.jar;C:\Users\Harsh\.m2\repository\com\fasterxml\jackson\datatype\jackson-datatype-jsr310\2.15.4\jackson-datatype-jsr310-2.15.4.jar;C:\Users\Harsh\.m2\repository\com\fasterxml\jackson\module\jackson-module-parameter-names\2.15.4\jackson-module-parameter-names-2.15.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter-tomcat\3.2.4\spring-boot-starter-tomcat-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\apache\tomcat\embed\tomcat-embed-core\10.1.19\tomcat-embed-core-10.1.19.jar;C:\Users\Harsh\.m2\repository\org\apache\tomcat\embed\tomcat-embed-el\10.1.19\tomcat-embed-el-10.1.19.jar;C:\Users\Harsh\.m2\repository\org\apache\tomcat\embed\tomcat-embed-websocket\10.1.19\tomcat-embed-websocket-10.1.19.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-web\6.1.5\spring-web-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-beans\6.1.5\spring-beans-6.1.5.jar;C:\Users\Harsh\.m2\repository\io\micrometer\micrometer-observation\1.12.4\micrometer-observation-1.12.4.jar;C:\Users\Harsh\.m2\repository\io\micrometer\micrometer-commons\1.12.4\micrometer-commons-1.12.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-webmvc\6.1.5\spring-webmvc-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-aop\6.1.5\spring-aop-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-context\6.1.5\spring-context-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-expression\6.1.5\spring-expression-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter-websocket\3.2.4\spring-boot-starter-websocket-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-messaging\6.1.5\spring-messaging-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-websocket\6.1.5\spring-websocket-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-devtools\3.2.4\spring-boot-devtools-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot\3.2.4\spring-boot-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-autoconfigure\3.2.4\spring-boot-autoconfigure-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\security\spring-security-crypto\6.2.3\spring-security-crypto-6.2.3.jar;C:\Users\Harsh\.m2\repository\net\java\dev\jna\jna-platform\5.14.0\jna-platform-5.14.0.jar;C:\Users\Harsh\.m2\repository\net\java\dev\jna\jna\5.14.0\jna-5.14.0.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-starter-test\3.2.4\spring-boot-starter-test-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-test\3.2.4\spring-boot-test-3.2.4.jar;C:\Users\Harsh\.m2\repository\org\springframework\boot\spring-boot-test-autoconfigure\3.2.4\spring-boot-test-autoconfigure-3.2.4.jar;C:\Users\Harsh\.m2\repository\com\jayway\jsonpath\json-path\2.9.0\json-path-2.9.0.jar;C:\Users\Harsh\.m2\repository\org\slf4j\slf4j-api\2.0.12\slf4j-api-2.0.12.jar;C:\Users\Harsh\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\4.0.2\jakarta.xml.bind-api-4.0.2.jar;C:\Users\Harsh\.m2\repository\jakarta\activation\jakarta.activation-api\2.1.3\jakarta.activation-api-2.1.3.jar;C:\Users\Harsh\.m2\repository\net\minidev\json-smart\2.5.0\json-smart-2.5.0.jar;C:\Users\Harsh\.m2\repository\net\minidev\accessors-smart\2.5.0\accessors-smart-2.5.0.jar;C:\Users\Harsh\.m2\repository\org\ow2\asm\asm\9.3\asm-9.3.jar;C:\Users\Harsh\.m2\repository\org\assertj\assertj-core\3.24.2\assertj-core-3.24.2.jar;C:\Users\Harsh\.m2\repository\net\bytebuddy\byte-buddy\1.14.12\byte-buddy-1.14.12.jar;C:\Users\Harsh\.m2\repository\org\awaitility\awaitility\4.2.0\awaitility-4.2.0.jar;C:\Users\Harsh\.m2\repository\org\hamcrest\hamcrest\2.2\hamcrest-2.2.jar;C:\Users\Harsh\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\Harsh\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\Harsh\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\Harsh\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\Harsh\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\Harsh\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\Harsh\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\Harsh\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;C:\Users\Harsh\.m2\repository\org\mockito\mockito-core\5.7.0\mockito-core-5.7.0.jar;C:\Users\Harsh\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.12\byte-buddy-agent-1.14.12.jar;C:\Users\Harsh\.m2\repository\org\objenesis\objenesis\3.3\objenesis-3.3.jar;C:\Users\Harsh\.m2\repository\org\mockito\mockito-junit-jupiter\5.7.0\mockito-junit-jupiter-5.7.0.jar;C:\Users\Harsh\.m2\repository\org\skyscreamer\jsonassert\1.5.1\jsonassert-1.5.1.jar;C:\Users\Harsh\.m2\repository\com\vaadin\external\google\android-json\0.0.20131108.vaadin1\android-json-0.0.20131108.vaadin1.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-core\6.1.5\spring-core-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-jcl\6.1.5\spring-jcl-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\springframework\spring-test\6.1.5\spring-test-6.1.5.jar;C:\Users\Harsh\.m2\repository\org\xmlunit\xmlunit-core\2.9.1\xmlunit-core-2.9.1.jar;"/>
     <property name="sun.cpu.endian" value="little"/>
@@ -30,7 +30,7 @@
     <property name="line.separator" value="&#10;"/>
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
-    <property name="surefire.real.class.path" value="C:\Users\Harsh\AppData\Local\Temp\surefire16760870122858174634\surefirebooter-20261012135644728_3.jar"/>
+    <property name="surefire.real.class.path" value="C:\Users\Harsh\AppData\Local\Temp\surefire7099089819539113288\surefirebooter-20261012154131414_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="java.runtime.version" value="17.0.17+10"/>
@@ -58,33 +58,33 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="61.0"/>
   </properties>
-  <testcase name="testHandleApproveSuccessAndFailure" classname="com.phoneremote.admin.AdminLogsTest" time="2.469">
-    <system-out><![CDATA[13:56:46.131 [main] INFO com.phoneremote.admin.AdminController -- Logging started
+  <testcase name="testHandleApproveSuccessAndFailure" classname="com.phoneremote.admin.AdminLogsTest" time="3.279">
+    <system-out><![CDATA[15:41:33.510 [main] INFO com.phoneremote.admin.AdminController -- Logging started
 ]]></system-out>
   </testcase>
-  <testcase name="testAccessDeniedForNonLoopback" classname="com.phoneremote.admin.AdminLogsTest" time="0.028">
-    <system-out><![CDATA[13:56:48.510 [main] INFO com.phoneremote.admin.AdminController -- Logging started
-2026-10-12T13:56:48.510+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
+  <testcase name="testAccessDeniedForNonLoopback" classname="com.phoneremote.admin.AdminLogsTest" time="0.024">
+    <system-out><![CDATA[15:41:36.646 [main] INFO com.phoneremote.admin.AdminController -- Logging started
+2026-10-12T15:41:36.646+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
 ]]></system-out>
   </testcase>
-  <testcase name="testLogbackConfiguration" classname="com.phoneremote.admin.AdminLogsTest" time="0.013">
-    <system-out><![CDATA[13:56:48.541 [main] INFO com.phoneremote.admin.AdminController -- Logging started
-2026-10-12T13:56:48.541+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
+  <testcase name="testLogbackConfiguration" classname="com.phoneremote.admin.AdminLogsTest" time="0.012">
+    <system-out><![CDATA[15:41:36.671 [main] INFO com.phoneremote.admin.AdminController -- Logging started
+2026-10-12T15:41:36.671+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
 ]]></system-out>
   </testcase>
-  <testcase name="testRingBufferSizeLimit" classname="com.phoneremote.admin.AdminLogsTest" time="0.028">
-    <system-out><![CDATA[13:56:48.560 [main] INFO com.phoneremote.admin.AdminController -- Logging started
-2026-10-12T13:56:48.560+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
+  <testcase name="testRingBufferSizeLimit" classname="com.phoneremote.admin.AdminLogsTest" time="0.029">
+    <system-out><![CDATA[15:41:36.687 [main] INFO com.phoneremote.admin.AdminController -- Logging started
+2026-10-12T15:41:36.687+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
 ]]></system-out>
   </testcase>
-  <testcase name="testLogFilteringAndHtmlEscaping" classname="com.phoneremote.admin.AdminLogsTest" time="0.385">
-    <system-out><![CDATA[13:56:48.590 [main] INFO com.phoneremote.admin.AdminController -- Logging started
-2026-10-12T13:56:48.590+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
+  <testcase name="testLogFilteringAndHtmlEscaping" classname="com.phoneremote.admin.AdminLogsTest" time="0.508">
+    <system-out><![CDATA[15:41:36.722 [main] INFO com.phoneremote.admin.AdminController -- Logging started
+2026-10-12T15:41:36.722+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
 ]]></system-out>
   </testcase>
   <testcase name="testAccessDeniedForWrongHost" classname="com.phoneremote.admin.AdminLogsTest" time="0.005">
-    <system-out><![CDATA[13:56:48.974 [main] INFO com.phoneremote.admin.AdminController -- Logging started
-2026-10-12T13:56:48.974+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
+    <system-out><![CDATA[15:41:37.231 [main] INFO com.phoneremote.admin.AdminController -- Logging started
+2026-10-12T15:41:37.231+05:30  INFO   --- [           main] com.phoneremote.admin.AdminController    : Logging started
 ]]></system-out>
   </testcase>
 </testsuite>

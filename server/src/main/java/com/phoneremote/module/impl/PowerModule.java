@@ -7,6 +7,7 @@ import com.phoneremote.adapter.PowerAction;
 import com.phoneremote.adapter.PowerAdapter;
 import com.phoneremote.module.RemoteModule;
 import com.phoneremote.ws.Session;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -20,6 +21,7 @@ public class PowerModule implements RemoteModule {
 
     private static final Logger logger = Logger.getLogger(PowerModule.class.getName());
     private final PowerAdapter powerAdapter;
+    private final com.phoneremote.ws.TimeSource timeSource;
     private final ObjectMapper mapper = new ObjectMapper();
     private final Map<String, TokenInfo> tokens = new ConcurrentHashMap<>();
 
@@ -29,8 +31,14 @@ public class PowerModule implements RemoteModule {
         long expiryTime;
     }
 
+    @Autowired
     public PowerModule(PowerAdapter powerAdapter) {
+        this(powerAdapter, com.phoneremote.ws.TimeSource.SYSTEM);
+    }
+
+    public PowerModule(PowerAdapter powerAdapter, com.phoneremote.ws.TimeSource timeSource) {
         this.powerAdapter = powerAdapter;
+        this.timeSource = timeSource;
     }
 
     @Override
@@ -38,6 +46,13 @@ public class PowerModule implements RemoteModule {
 
     @Override
     public String displayName() { return "Power"; }
+
+    @Override
+    public void onClose(Session s) {
+        if (s != null) {
+            tokens.values().removeIf(info -> s.getId().equals(info.sessionId));
+        }
+    }
 
     @Override
     public void onMessage(Session s, String type, JsonNode data) {
@@ -50,7 +65,7 @@ public class PowerModule implements RemoteModule {
                 TokenInfo info = new TokenInfo();
                 info.sessionId = s.getId();
                 info.action = action;
-                info.expiryTime = System.currentTimeMillis() + 10000; // 10 seconds validity
+                info.expiryTime = timeSource.currentTimeMillis() + 10000; // 10 seconds validity
                 tokens.put(token, info);
 
                 ObjectNode reply = mapper.createObjectNode();
@@ -68,7 +83,7 @@ public class PowerModule implements RemoteModule {
                 PowerAction action = PowerAction.valueOf(actionStr);
                 
                 TokenInfo info = tokens.remove(token);
-                if (info == null || info.expiryTime < System.currentTimeMillis() ||
+                if (info == null || info.expiryTime < timeSource.currentTimeMillis() ||
                     !info.sessionId.equals(s.getId()) || info.action != action) {
                     
                     ObjectNode reply = mapper.createObjectNode();
@@ -117,12 +132,16 @@ public class PowerModule implements RemoteModule {
     }
 
     private void executeAction(PowerAction action) {
-        switch (action) {
-            case SHUTDOWN: powerAdapter.shutdown(); break;
-            case RESTART: powerAdapter.restart(); break;
-            case SLEEP: powerAdapter.sleep(); break;
-            case HIBERNATE: powerAdapter.hibernate(); break;
-            case LOCK: powerAdapter.lock(); break;
+        if (action == PowerAction.SHUTDOWN) {
+            powerAdapter.shutdown();
+        } else if (action == PowerAction.RESTART) {
+            powerAdapter.restart();
+        } else if (action == PowerAction.SLEEP) {
+            powerAdapter.sleep();
+        } else if (action == PowerAction.HIBERNATE) {
+            powerAdapter.hibernate();
+        } else if (action == PowerAction.LOCK) {
+            powerAdapter.lock();
         }
     }
 }

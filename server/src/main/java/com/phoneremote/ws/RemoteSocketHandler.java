@@ -35,8 +35,17 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
     private final Map<String, java.util.Set<Session>> deviceSessions = new ConcurrentHashMap<>();
     private final Map<String, PendingApproval> pendingApprovals = new ConcurrentHashMap<>();
     private final Timer authTimer = new Timer(true);
+    private long authTimeoutMs = 10000L; // 10 seconds timeout
     private static final int MAX_PAYLOAD_LENGTH = 262144; // 256 KB safe limit for text payloads
     private volatile boolean remoteControlEnabled = true;
+
+    public long getAuthTimeoutMs() {
+        return authTimeoutMs;
+    }
+
+    public void setAuthTimeoutMs(long authTimeoutMs) {
+        this.authTimeoutMs = authTimeoutMs;
+    }
 
     public static class PendingApproval {
         public final String deviceId;
@@ -171,7 +180,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                     session.close();
                 }
             }
-        }, 60000); // 60 seconds timeout
+        }, authTimeoutMs);
     }
 
     @Override
@@ -182,8 +191,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
         }
         String payload = message.getPayload();
         if (payload.length() > MAX_PAYLOAD_LENGTH) {
-            wsSession.close(CloseStatus.BAD_DATA.withReason("Message too large"));
-            return;
+            return; // Reject oversized message without crashing the session
         }
 
         Session session = sessions.get(wsSession.getId());
