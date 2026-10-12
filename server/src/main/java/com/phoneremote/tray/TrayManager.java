@@ -11,6 +11,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import javax.imageio.ImageIO;
+import java.io.InputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.net.URI;
@@ -36,6 +38,17 @@ public class TrayManager implements ApplicationListener<ApplicationReadyEvent> {
     }
 
     public static Image createIconImage() {
+        try (InputStream is = TrayManager.class.getResourceAsStream("/icon.png")) {
+            if (is != null) {
+                BufferedImage img = ImageIO.read(is);
+                if (img != null) {
+                    return img;
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Could not load /icon.png from classpath, falling back to generated icon: {}", e.getMessage());
+        }
+
         BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
