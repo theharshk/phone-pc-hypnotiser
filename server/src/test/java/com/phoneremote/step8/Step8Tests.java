@@ -76,8 +76,15 @@ public class Step8Tests {
         assertEquals("/SC", createArgs.get(5));
         assertEquals("ONLOGON", createArgs.get(6));
         assertEquals("/TR", createArgs.get(7));
-        assertTrue(createArgs.get(8).contains("cd /d \"C:\\mock\\working\\dir\""));
-        assertTrue(createArgs.get(8).contains("-jar server.jar"));
+
+        String taskRun = createArgs.get(8);
+        assertFalse(taskRun.contains("cmd.exe"));
+        assertFalse(taskRun.contains("cd"));
+        assertTrue(taskRun.startsWith("'"));
+        assertTrue(taskRun.endsWith("'"));
+        assertTrue(taskRun.contains("'-Duser.dir=C:\\mock\\working\\dir'"));
+        assertTrue(taskRun.contains("-jar 'C:\\mock\\working\\dir\\server.jar'"));
+        assertEquals(autoStart.buildTaskRunCommand(), taskRun);
 
         // Enable auto-start execution
         fakeRunner.returnCode = 0;
@@ -106,6 +113,47 @@ public class Step8Tests {
         // Failure code handling
         fakeRunner.returnCode = 1;
         assertFalse(autoStart.isAutoStartEnabled());
+        assertFalse(autoStart.enableAutoStart());
+        assertFalse(autoStart.disableAutoStart());
+    }
+
+    @Test
+    void testAutoStartWithSpacesInWorkingDir() {
+        FakeCommandRunner fakeRunner = new FakeCommandRunner();
+        AutoStartManager autoStart = new AutoStartManager(fakeRunner, "F:\\phone pc hypnotiser");
+
+        List<String> createArgs = autoStart.buildCreateTaskArgs();
+        assertEquals(9, createArgs.size());
+        assertEquals("schtasks", createArgs.get(0));
+        assertEquals("/Create", createArgs.get(1));
+        assertEquals("/F", createArgs.get(2));
+        assertEquals("/TN", createArgs.get(3));
+        assertEquals(AutoStartManager.TASK_NAME, createArgs.get(4));
+        assertEquals("/SC", createArgs.get(5));
+        assertEquals("ONLOGON", createArgs.get(6));
+        assertEquals("/TR", createArgs.get(7));
+
+        String taskRun = createArgs.get(8);
+        assertFalse(taskRun.contains("cmd.exe"));
+        assertFalse(taskRun.contains("cd"));
+        assertTrue(taskRun.startsWith("'"));
+        assertTrue(taskRun.endsWith("'"));
+        assertTrue(taskRun.contains("'-Duser.dir=F:\\phone pc hypnotiser'"));
+        assertTrue(taskRun.contains("-jar 'F:\\phone pc hypnotiser\\server.jar'"));
+        assertEquals(autoStart.buildTaskRunCommand(), taskRun);
+    }
+
+    @Test
+    void testDynamicJarResolution() throws Exception {
+        FakeCommandRunner fakeRunner = new FakeCommandRunner();
+        File mockTarget = new File(tempDir, "target");
+        mockTarget.mkdirs();
+        File mockSnapshotJar = new File(mockTarget, "server-1.0-SNAPSHOT.jar");
+        mockSnapshotJar.createNewFile();
+
+        AutoStartManager autoStart = new AutoStartManager(fakeRunner, tempDir);
+        assertEquals(mockSnapshotJar.getAbsolutePath(), autoStart.resolveServerJar());
+        assertTrue(autoStart.buildTaskRunCommand().contains("-jar '" + mockSnapshotJar.getAbsolutePath() + "'"));
     }
 
     @Test

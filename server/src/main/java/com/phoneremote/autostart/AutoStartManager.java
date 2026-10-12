@@ -1,6 +1,8 @@
 package com.phoneremote.autostart;
 
 import com.phoneremote.util.CommandRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -9,6 +11,7 @@ import java.util.List;
 @Component
 public class AutoStartManager {
 
+    private static final Logger logger = LoggerFactory.getLogger(AutoStartManager.class);
     public static final String TASK_NAME = "PhoneRemote";
 
     private final CommandRunner commandRunner;
@@ -28,6 +31,24 @@ public class AutoStartManager {
         return workingDir;
     }
 
+    public String resolveServerJar() {
+        File serverJar = new File(workingDir, "server.jar");
+        if (serverJar.exists()) {
+            return serverJar.getAbsolutePath();
+        }
+        File targetJar = new File(workingDir, "target" + File.separator + "server-1.0-SNAPSHOT.jar");
+        if (targetJar.exists()) {
+            return targetJar.getAbsolutePath();
+        }
+        File snapshotJar = new File(workingDir, "server-1.0-SNAPSHOT.jar");
+        if (snapshotJar.exists()) {
+            return snapshotJar.getAbsolutePath();
+        }
+        return workingDir.endsWith("\\") || workingDir.endsWith("/")
+                ? workingDir + "server.jar"
+                : workingDir + "\\server.jar";
+    }
+
     public String buildTaskRunCommand() {
         String javaHome = System.getProperty("java.home");
         String javawPath = "javaw";
@@ -37,7 +58,11 @@ public class AutoStartManager {
                 javawPath = javawFile.getAbsolutePath();
             }
         }
-        return "cmd.exe /c cd /d \"" + workingDir + "\" && \"" + javawPath + "\" -jar server.jar";
+        String serverJar = resolveServerJar();
+        String cleanWorkingDir = workingDir.endsWith("\\") || workingDir.endsWith("/")
+                ? workingDir.substring(0, workingDir.length() - 1)
+                : workingDir;
+        return "'" + javawPath + "' '-Duser.dir=" + cleanWorkingDir + "' -jar '" + serverJar + "'";
     }
 
     public List<String> buildCreateTaskArgs() {
@@ -54,12 +79,20 @@ public class AutoStartManager {
 
     public boolean enableAutoStart() throws Exception {
         int exitCode = commandRunner.run(buildCreateTaskArgs());
-        return exitCode == 0;
+        if (exitCode != 0) {
+            logger.error("Failed to enable auto-start, exit code: {}", exitCode);
+            return false;
+        }
+        return true;
     }
 
     public boolean disableAutoStart() throws Exception {
         int exitCode = commandRunner.run(buildDeleteTaskArgs());
-        return exitCode == 0;
+        if (exitCode != 0) {
+            logger.error("Failed to disable auto-start, exit code: {}", exitCode);
+            return false;
+        }
+        return true;
     }
 
     public boolean isAutoStartEnabled() throws Exception {

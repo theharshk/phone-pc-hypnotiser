@@ -111,11 +111,19 @@ public class TrayManager implements ApplicationListener<ApplicationReadyEvent> {
             autoStartItem.addActionListener(e -> {
                 try {
                     if (autoStartManager.isAutoStartEnabled()) {
-                        autoStartManager.disableAutoStart();
-                        autoStartItem.setLabel("Enable auto-start");
+                        if (autoStartManager.disableAutoStart()) {
+                            autoStartItem.setLabel("Enable auto-start");
+                        } else {
+                            logger.warn("Failed to disable auto-start");
+                            autoStartItem.setLabel("Disable auto-start");
+                        }
                     } else {
-                        autoStartManager.enableAutoStart();
-                        autoStartItem.setLabel("Disable auto-start");
+                        if (autoStartManager.enableAutoStart()) {
+                            autoStartItem.setLabel("Disable auto-start");
+                        } else {
+                            logger.warn("Failed to enable auto-start");
+                            autoStartItem.setLabel("Enable auto-start");
+                        }
                     }
                 } catch (Exception ex) {
                     logger.error("Failed to toggle auto-start", ex);
