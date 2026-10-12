@@ -5,6 +5,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import com.phoneremote.logging.InMemoryLogAppender;
+import com.phoneremote.ws.RemoteSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -118,5 +119,42 @@ class AdminLogsTest {
 
         assertEquals(ch.qos.logback.classic.Level.DEBUG, frameLogger.getLevel(), "com.phoneremote.frames must default to DEBUG for frame logging");
         assertFalse(frameLogger.isAdditive(), "Frame logs must not be additive to prevent filling the App log");
+    }
+
+    @Test
+    void testHandleApproveSuccessAndFailure() throws Exception {
+        RemoteSocketHandler socketHandler = mock(RemoteSocketHandler.class);
+        AdminController adminController = new AdminController(null, null, socketHandler);
+
+        when(socketHandler.approvePendingDevice("device-123")).thenReturn(true);
+        when(socketHandler.approvePendingDevice("device-404")).thenReturn(false);
+
+        // 1. Success approval
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRemoteAddr("127.0.0.1");
+        req.addHeader("Host", "localhost:8080");
+        req.addHeader("Origin", "http://localhost:8080");
+        req.getSession().setAttribute("csrf_token", "test-csrf");
+        req.setParameter("csrf", "test-csrf");
+        req.setParameter("deviceId", "device-123");
+        req.setParameter("action", "approve");
+
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        String jsonSuccess = adminController.handleApprove(req, res);
+        assertEquals("{\"success\":true}", jsonSuccess);
+
+        // 2. Failed approval (device not found or session closed)
+        MockHttpServletRequest reqFail = new MockHttpServletRequest();
+        reqFail.setRemoteAddr("127.0.0.1");
+        reqFail.addHeader("Host", "localhost:8080");
+        reqFail.addHeader("Origin", "http://localhost:8080");
+        reqFail.getSession().setAttribute("csrf_token", "test-csrf");
+        reqFail.setParameter("csrf", "test-csrf");
+        reqFail.setParameter("deviceId", "device-404");
+        reqFail.setParameter("action", "approve");
+
+        MockHttpServletResponse resFail = new MockHttpServletResponse();
+        String jsonFail = adminController.handleApprove(reqFail, resFail);
+        assertEquals("{\"success\":false,\"error\":\"Device not found or session closed\"}", jsonFail);
     }
 }

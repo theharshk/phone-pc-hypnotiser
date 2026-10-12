@@ -347,10 +347,12 @@ public class AdminController {
             return "{\"success\":false,\"error\":\"Missing parameters\"}";
         }
         if ("approve".equals(action)) {
-            if (socketHandler != null) {
-                socketHandler.approvePendingDevice(deviceId);
+            boolean approved = socketHandler != null && socketHandler.approvePendingDevice(deviceId);
+            if (approved) {
+                return "{\"success\":true}";
+            } else {
+                return "{\"success\":false,\"error\":\"Device not found or session closed\"}";
             }
-            return "{\"success\":true}";
         } else if ("reject".equals(action)) {
             if (socketHandler != null) {
                 socketHandler.rejectPendingDevice(deviceId);

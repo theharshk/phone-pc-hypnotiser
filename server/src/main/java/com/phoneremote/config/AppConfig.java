@@ -69,4 +69,12 @@ public class AppConfig implements WebMvcConfigurer, WebSocketConfigurer {
                     public void afterHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, WebSocketHandler wsHandler, Exception exception) {}
                 });
     }
+
+    @org.springframework.context.annotation.Bean
+    public org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean createWebSocketContainer() {
+        org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean container = new org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean();
+        container.setMaxTextMessageBufferSize(262144);
+        container.setMaxBinaryMessageBufferSize(262144);
+        return container;
+    }
 }

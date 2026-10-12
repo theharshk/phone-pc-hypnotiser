@@ -13,27 +13,37 @@ public class JnaKeyboard {
 
     public void typeText(String text) {
         if (text == null || text.isEmpty()) return;
-        INPUT[] inputs = (INPUT[]) new INPUT().toArray(text.length() * 2);
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            
-            inputs[i * 2].type = new DWORD(INPUT.INPUT_KEYBOARD);
-            inputs[i * 2].input.setType("ki");
-            inputs[i * 2].input.ki.wScan = new WORD(c);
-            inputs[i * 2].input.ki.time = new DWORD(0);
-            inputs[i * 2].input.ki.dwExtraInfo = new ULONG_PTR(0);
-            inputs[i * 2].input.ki.wVk = new WORD(0);
-            inputs[i * 2].input.ki.dwFlags = new DWORD(KEYEVENTF_UNICODE);
+        int chunkSize = 50;
+        for (int start = 0; start < text.length(); start += chunkSize) {
+            int end = Math.min(start + chunkSize, text.length());
+            int len = end - start;
+            INPUT[] inputs = (INPUT[]) new INPUT().toArray(len * 2);
+            for (int i = 0; i < len; i++) {
+                char c = text.charAt(start + i);
+                
+                inputs[i * 2].type = new DWORD(INPUT.INPUT_KEYBOARD);
+                inputs[i * 2].input.setType("ki");
+                inputs[i * 2].input.ki.wScan = new WORD(c);
+                inputs[i * 2].input.ki.time = new DWORD(0);
+                inputs[i * 2].input.ki.dwExtraInfo = new ULONG_PTR(0);
+                inputs[i * 2].input.ki.wVk = new WORD(0);
+                inputs[i * 2].input.ki.dwFlags = new DWORD(KEYEVENTF_UNICODE);
 
-            inputs[i * 2 + 1].type = new DWORD(INPUT.INPUT_KEYBOARD);
-            inputs[i * 2 + 1].input.setType("ki");
-            inputs[i * 2 + 1].input.ki.wScan = new WORD(c);
-            inputs[i * 2 + 1].input.ki.time = new DWORD(0);
-            inputs[i * 2 + 1].input.ki.dwExtraInfo = new ULONG_PTR(0);
-            inputs[i * 2 + 1].input.ki.wVk = new WORD(0);
-            inputs[i * 2 + 1].input.ki.dwFlags = new DWORD(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
+                inputs[i * 2 + 1].type = new DWORD(INPUT.INPUT_KEYBOARD);
+                inputs[i * 2 + 1].input.setType("ki");
+                inputs[i * 2 + 1].input.ki.wScan = new WORD(c);
+                inputs[i * 2 + 1].input.ki.time = new DWORD(0);
+                inputs[i * 2 + 1].input.ki.dwExtraInfo = new ULONG_PTR(0);
+                inputs[i * 2 + 1].input.ki.wVk = new WORD(0);
+                inputs[i * 2 + 1].input.ki.dwFlags = new DWORD(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
+            }
+            User32.INSTANCE.SendInput(new DWORD(inputs.length), inputs, inputs[0].size());
+            if (end < text.length()) {
+                try {
+                    Thread.sleep(3);
+                } catch (InterruptedException ignored) {}
+            }
         }
-        User32.INSTANCE.SendInput(new DWORD(inputs.length), inputs, inputs[0].size());
     }
 
     public void keyDown(int vkCode) {

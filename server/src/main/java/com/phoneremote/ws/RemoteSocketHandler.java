@@ -35,7 +35,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
     private final Map<String, java.util.Set<Session>> deviceSessions = new ConcurrentHashMap<>();
     private final Map<String, PendingApproval> pendingApprovals = new ConcurrentHashMap<>();
     private final Timer authTimer = new Timer(true);
-    private static final int MAX_PAYLOAD_LENGTH = 8192;
+    private static final int MAX_PAYLOAD_LENGTH = 262144; // 256 KB safe limit for text payloads
     private volatile boolean remoteControlEnabled = true;
 
     public static class PendingApproval {
@@ -61,8 +61,24 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
         if (!enabled) {
             java.util.List<Session> all = new java.util.ArrayList<>(sessions.values());
             for (Session s : all) {
-                revokeSession(s);
+                try {
+                    sendError(s, "paused");
+                } catch (Exception ignored) {}
+                for (RemoteModule m : moduleRegistry.getAll()) {
+                    try {
+                        m.onClose(s);
+                    } catch (Exception ignored) {}
+                }
+                String deviceId = s.getDeviceId();
+                if (deviceId != null) {
+                    unregisterDeviceSession(deviceId, s);
+                }
+                s.setAuthenticated(false);
+                try {
+                    s.close();
+                } catch (Exception ignored) {}
             }
+            sessions.clear();
             pendingApprovals.clear();
         }
     }
@@ -155,7 +171,7 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
                     session.close();
                 }
             }
-        }, 10000); // 10 seconds timeout
+        }, 60000); // 60 seconds timeout
     }
 
     @Override
@@ -190,13 +206,19 @@ public class RemoteSocketHandler extends TextWebSocketHandler {
             } else {
                 RemoteModule module = moduleRegistry.get(m);
                 if (module != null) {
-                    session.execute(() -> {
+                    if ("keyboard".equals(m) && "cancel_stream".equals(t)) {
                         try {
                             module.onMessage(session, t, d);
-                        } catch (Exception e) {
-                            System.err.println("Module error: " + e.getMessage());
-                        }
-                    });
+                        } catch (Exception ignored) {}
+                    } else {
+                        session.execute(() -> {
+                            try {
+                                module.onMessage(session, t, d);
+                            } catch (Exception e) {
+                                System.err.println("Module error: " + e.getMessage());
+                            }
+                        });
+                    }
                 }
             }
         } catch (Exception e) {
