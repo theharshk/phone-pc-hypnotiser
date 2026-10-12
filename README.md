@@ -1,5 +1,7 @@
 # Phone Remote (Phone-to-PC Controller)
 
+[![CI](https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml/badge.svg)](https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml)
+
 A self-hosted, lightweight remote control system allowing an Android smartphone to control a Windows PC over local Wi-Fi. Built with a **Java (Spring Boot)** host and a zero-install **Progressive Web App (PWA)** client.
 
 <!-- Placeholders for Screenshots and Demo GIF -->
@@ -148,12 +150,12 @@ Phone                         Server                       PC / Admin
 ## Security Notes
 
 - **Credential Safety:** PINs are hashed using salted BCrypt. Plaintext PINs and tokens are never logged or stored.
-- **Brute Force Protection:** Escalating rate limiting locks out attackers after 5 invalid attempts (5 minutes initial, doubling up to 24 hours).
+- **Brute Force Protection:** Escalating rate limiting locks out attackers after 5 invalid attempts (5 minutes initial, doubling up to 24 hours). A PIN sent during an active lockout is not counted and does not extend the timer.
 - **Admin Surface Isolation:**
   - The `/admin` endpoints bind strictly to loopback (`127.0.0.1` / `[::1]`). Non-loopback requests are rejected with `403 Forbidden`.
   - Enforces `Host` header validation against DNS rebinding.
   - Requires CSRF tokens on state-modifying requests and validates WebSocket `Origin` headers.
-- **Safe Execution:** Power actions and commands are restricted to strict enum whitelists. No client-supplied input is ever passed to an operating system shell.
+- **Safe Execution:** Power actions and commands are restricted to strict enum whitelists with short-lived (10s) confirm tokens. No client-supplied input is ever passed to an operating system shell.
 - **Logging Auditing:** App and frame logs automatically rotate (10 MB per file, max 3 retained). No typed keystrokes, passwords, tokens, raw payloads, or screen buffers are logged.
 
 ---
@@ -170,17 +172,82 @@ Phone                         Server                       PC / Admin
 
 ---
 
+## Design Decisions
+
+1. **Why WebSocket:** A single full-duplex WebSocket connection at `/ws` carries both JSON control messages and binary JPEG screen frames. This avoids the HTTP request/response handshake overhead, lowers LAN input latency to under 50 ms, gives continuous connection state for heartbeat tracking, and centralizes authentication to a single check.
+2. **Why Adapters:** Operating system operations (`Robot`, JNA `SendInput`, process invocation, screen capture) are abstracted behind adapter interfaces (`InputAdapter`, `PowerAdapter`, `ScreenAdapter`). This completely decouples domain modules from native Windows APIs and allows the entire test suite to execute on headless CI environments using fake/mock adapters without requiring physical screens or displays.
+3. **Backpressure Strategy:** High-frequency screen streaming decoupled across capture, encode, and send threads uses bounded queues (capacity 2) and drops oldest frames when downstream consumers fall behind. The server enforces a maximum of 2 unacknowledged frames in flight. This guarantees that latency never spikes or accumulates buffer lag under Wi-Fi fluctuations.
+4. **Live Revocation:** Authentication state is treated as a live, continuous session property rather than only a one-time check during `hello`. When an administrator revokes a device, an in-memory device-to-sessions index instantly terminates active sockets, fires module cleanup (`onClose` releases held mouse buttons and keys), and clears credentials on the client.
+5. **Lockout Design:** PIN brute-force attempts are throttled by escalating lockouts (5 wrong tries trigger 5 minutes, doubling on repeat attempts). Crucially, PIN attempts submitted during an active lockout are ignored—they are neither counted as new failures nor do they extend the remaining lockout window—preventing malicious permanent denial of service.
+6. **Why Plain HTTP for Now:** Local Wi-Fi setup requires zero friction for ordinary users. Self-signed TLS certificates require installing and trusting custom root CA certificates on mobile devices, which creates significant onboarding hurdles. Plain HTTP works out-of-the-box in under 2 minutes. Secure HTTPS and WAN remote access are architected for v2 (via Tailscale or relay tunnels), which will also unlock full PWA service workers and offline caching.
+
+---
+
+## Testing
+
+### Automated Testing (JUnit 5, Mockito, Spring Boot Test)
+The automated test suite runs completely headless without requiring a display or native Windows Robot:
+- **Unit & Logic Tests:** PIN hashing (BCrypt), lockout tracker escalation and freezing with mock clocks, cryptographic token hashing and verification, atomic file configuration writes.
+- **Module Tests:** Touchpad coordinate delta handling, keyboard unicode and sticky modifiers, media controls, power confirm tokens and delayed shutdown scheduling, and screen frame pipeline formatting against `FakeInputAdapter`, `FakePowerAdapter`, and `FakeScreenAdapter`.
+- **Security & Hardening Tests (`SecurityTests`):**
+  - Rejection of unauthenticated messages across touchpad, keyboard, media, power, and screen modules.
+  - Enforcement of 10-second timeout on unauthenticated sockets.
+  - Rejection of unknown and revoked tokens in `hello`.
+  - WebSocket `Origin` header validation against `Host` (with documented missing-origin allowance).
+  - Loopback-only address, Host header, and CSRF token enforcement on all `/admin` GET and POST routes.
+  - Graceful rejection of malformed JSON and oversized (>256 KB) messages without crashing or terminating the session.
+  - Power action execution protection against missing, expired, reused, wrong-session, and mismatched confirm tokens.
+  - Verification that PIN submissions during lockout do not increment failure strikes or extend time.
+  - HTML escaping of device names and log outputs in admin dashboard JSON responses.
+  - Automated log capturing verifying that secrets (PINs, tokens, typed text, raw incoming payloads) never appear in application logs or standard output.
+
+### Manual Verification
+- Physical mobile device verification (Android Chrome, Samsung Internet) over private Wi-Fi.
+- Touchpad gesture responsiveness, two-finger scrolling, and tap-and-drag accuracy.
+- Soft keyboard typing, modifier keys, and streaming clipboard typing across desktop target applications.
+- Windows System Tray menu functionality, auto-start toggle, and Private Firewall network profile testing.
+
+---
+
 ## Known Limits
 
 - **UAC Prompts & Elevated Windows:** Windows User Account Control (UAC) secure desktop and elevated administrator windows isolate input. Synthetic input injection via standard user privileges is blocked by Windows UIPI (User Interface Privilege Isolation). Run the server elevated if UAC interaction is required.
 - **Windows Lock Screen:** Input injection is disabled on the Windows lock screen for security reasons.
 - **Plain HTTP on LAN:** When accessed over plain `http://<LAN-IP>:8080`, browsers restrict certain PWA capabilities (such as full offline Service Workers). The web app functions normally through standard browser navigation and Home Screen shortcuts.
+- **Screen Capture Throughput:** `java.awt.Robot.createScreenCapture` is CPU-bound on Windows; pipelining yields ~10 fps at 720p.
 
 ---
 
-## Design Decisions
+## License
 
-1. **WebSocket over REST:** Bidirectional, single-connection transport drastically minimizes protocol overhead and input latency for continuous mouse movements and binary JPEG frames.
-2. **Adapter Abstractions:** Operating system specifics are isolated behind `InputAdapter`, `PowerAdapter`, and `ScreenAdapter` interfaces, allowing comprehensive unit and integration testing using mocks and fake adapters without requiring native Windows dependencies in CI.
-3. **Fixed Argument Arrays for System Commands:** All external system commands (such as `schtasks`) use fixed argument arrays routed through an injectable `CommandRunner` interface to eliminate shell injection vulnerabilities and facilitate robust unit testing.
-4. **Resilient Module Lifecycle:** Modules follow an idempotent lifecycle (`onOpen`, `onMessage`, `onClose`). Unexpected socket disconnects or revocations trigger `onClose()` to guarantee that held keys or mouse buttons are released.
+This project is licensed under the [MIT License](LICENSE).
+
+Copyright (c) 2026 YOUR NAME
+
+---
+
+## Third-party notices
+
+### Bundled Fonts
+- **Archivo**: Copyright (c) 2016 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo).
+  Licensed under the [SIL Open Font License, Version 1.1](http://scripts.sil.org/OFL).
+- **Instrument Sans**: Copyright (c) 2022 The Instrument Sans Project Authors (https://github.com/Instrument/Instrument-Sans).
+  Licensed under the [SIL Open Font License, Version 1.1](http://scripts.sil.org/OFL).
+- **JetBrains Mono**: Copyright (c) 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono).
+  Licensed under the [SIL Open Font License, Version 1.1](http://scripts.sil.org/OFL).
+
+### Main Dependencies
+- **Spring Boot (`spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-devtools`, `spring-boot-starter-test`)**:
+  Copyright (c) 2012-2024 VMware, Inc. Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+- **Spring Security Crypto (`spring-security-crypto`)**:
+  Copyright (c) 2002-2024 VMware, Inc. Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+- **Java Native Access (`jna-platform`)**:
+  Copyright (c) 2007-2024 Timothy Wall / JNA contributors. Dual-licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0) and [GNU Lesser General Public License, Version 2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
+- **Jackson (`jackson-databind`)**:
+  Copyright (c) FasterXML, LLC. Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+- **Logback (`logback-classic`)**:
+  Copyright (c) 1999-2024 QOS.ch. Dual-licensed under the [Eclipse Public License v1.0](http://www.eclipse.org/legal/epl-v10.html) and [GNU Lesser General Public License, Version 2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
+- **JUnit 5 (`junit-jupiter`)**:
+  Copyright (c) Eclipse Foundation. Licensed under the [Eclipse Public License v2.0](https://www.eclipse.org/legal/epl-2.0/).
+- **Mockito (`mockito-core`)**:
+  Copyright (c) 2007 Mockito contributors. Licensed under the [MIT License](https://opensource.org/licenses/MIT).
