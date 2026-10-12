@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
     let fullPath = fs.existsSync(path.join(__dirname, reqPath)) ? path.join(__dirname, reqPath) : path.join(__dirname, 'web', reqPath);
     if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
         const ext = path.extname(fullPath);
-        const map = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.woff2': 'font/woff2' };
+        const map = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.woff2': 'font/woff2', '.png': 'image/png' };
         res.writeHead(200, { 'Content-Type': map[ext] || 'text/plain' });
         res.end(fs.readFileSync(fullPath));
     } else {

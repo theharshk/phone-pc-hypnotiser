@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml/badge.svg)](https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml)
 
+> 🚧 **Project Status: Work in Progress (WIP)**  
+> This project is currently in active development. Core remote control features (Touchpad, Keyboard, Media, Power, and Screen Streaming) are fully functional over local Wi-Fi with an automated headless test suite. Conversion into a standalone `.exe`, installer generation, and extended features are underway.
+
 A self-hosted, lightweight remote control system allowing an Android smartphone to control a Windows PC over local Wi-Fi. Built with a **Java (Spring Boot)** host and a zero-install **Progressive Web App (PWA)** client.
 
 <!-- Placeholders for Screenshots and Demo GIF -->
@@ -65,24 +68,49 @@ flowchart TD
 
 ---
 
+## 🗺️ Project Roadmap & Future Plans
+
+### ✅ Completed & Tested (Current Version)
+- [x] **Core Remote Control:** Smooth cursor deltas, Unicode keyboard injection, multimedia controls, and safe power actions.
+- [x] **Low-Latency Screen Streaming:** Pipelined capture-encode-send threads (~10 fps at 720p).
+- [x] **Security & Auth:** Salted BCrypt PIN pairing, live session revocation, rate-limited lockout, and loopback-only admin dashboard.
+- [x] **Automated Testing & CI:** 66/66 automated JUnit tests using fake/headless OS adapters and GitHub Actions CI workflow.
+
+### 🚀 Next Up: Standalone Executable & UX
+- [ ] **Native `.exe` Conversion (`jpackage`):** Package the Java application into a standalone Windows `.exe` with an embedded, stripped-down Java runtime (via `jlink`). End users will **not need Java or Maven installed** on their PC.
+- [ ] **Windows Installer:** Provide a single-click `.exe` / `.msi` setup wizard that installs the app, adds Start Menu shortcuts, and bundles desktop icons.
+- [ ] **Windows Registry Auto-Start:** Migrate auto-start from Task Scheduler to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` so auto-start can be toggled without requiring Administrator rights and integrates directly with Windows Task Manager.
+- [ ] **Branded App Icon Integration:** Apply the custom power/hypnotic icon to the Windows System Tray, Taskbar, and browser PWA/Favicon.
+
+### 🔮 Future Milestones (v2 & Beyond)
+- [ ] **High-Performance Screen Capture:** Replace `Robot.createScreenCapture` with native GDI `BitBlt` or Desktop Duplication API (DirectX) for 30+ FPS streaming, with optional H.264 video encoding.
+- [ ] **Internet / WAN Remote Access (v2):** Secure remote access outside local Wi-Fi via Tailscale HTTPS or an end-to-end encrypted relay tunnel.
+- [ ] **Virtual Gamepad Module (v3):** Virtual Xbox 360 controller emulation via ViGEmBus driver, featuring dual touch joysticks, triggers, and phone gyroscope motion steering.
+
+---
+
 ## Setup and Installation
 
 ### Prerequisites
 - Windows 10 or 11
 - Java 17 or higher (Java 21 recommended)
-- Maven 3.8+ (or bundled Maven wrapper `mvnw.cmd`)
+- Maven 3.8+
 
 ### 1. Build
-Clone the repository and build the project:
+Clone the repository and build the server module:
 ```powershell
+cd server
 mvn clean package
 ```
+*(Or from the repository root: `mvn clean package -f server/pom.xml`)*
 
 ### 2. First Run (Terminal Wizard)
 Run the application from a terminal once to set up your security PIN:
 ```powershell
-java -jar server/target/server-1.0-SNAPSHOT.jar
+java -jar target/server-1.0-SNAPSHOT.jar
 ```
+*(Or from the repository root: `java -jar server/target/server-1.0-SNAPSHOT.jar`)*
+
 The interactive wizard will prompt:
 ```text
 === Phone Remote First Run ===
@@ -104,10 +132,29 @@ Admin address: http://localhost:8080/admin
 2. Enter your 6-digit PIN.
 3. Once authenticated, a revocable 32-byte cryptographic token is saved in `localStorage`, and the remote control tiles appear immediately.
 
-### 4. Background Start & Auto-Start
-- Right-click the **Phone Remote** icon in the Windows System Tray and select **"Enable auto-start"** to configure a scheduled logon task.
-- When launched in the background (no interactive terminal), the server checks for an existing `config.json`. If unconfigured, it exits immediately with:
-  `Run once from a terminal to set a PIN`
+### 4. Background Start & Auto-Start Setup Guide
+
+Windows Task Scheduler requires administrator privileges to register a task that executes automatically at user logon (`/SC ONLOGON`). Follow this quick one-time guide to enable auto-start:
+
+1. **Open PowerShell as Administrator:**
+   - Press the Windows Key, type `PowerShell`, right-click **Windows PowerShell**, and select **"Run as Administrator"**.
+2. **Launch the Server from the Admin Terminal:**
+   ```powershell
+   cd "path\to\phone pc hypnotiser\server"
+   java -jar target\server-1.0-SNAPSHOT.jar
+   ```
+3. **Enable Auto-Start from the System Tray:**
+   - Locate the **Phone Remote** icon in your Windows System Tray (next to the clock in the taskbar).
+   - Right-click the icon and click **"Enable auto-start"**.
+   - With administrator privileges active, Windows Task Scheduler successfully creates the `PhoneRemote` scheduled task.
+4. **Done!**
+   - You can now close the terminal or quit the app.
+   - On every future Windows login, Phone Remote will launch silently in the background.
+
+*(Note: Migration to standard unprivileged `HKCU` Windows Registry auto-start is planned on the roadmap to remove this one-time admin requirement).*
+
+> **Background Launch Note:** When launched automatically in the background (no interactive terminal), the server checks for an existing `config.json`. If unconfigured, it exits immediately with:
+> `Run once from a terminal to set a PIN`
 
 ---
 
@@ -211,6 +258,7 @@ The automated test suite runs completely headless without requiring a display or
 
 ## Known Limits
 
+- **Task Scheduler Auto-Start Elevation:** Creating logon tasks via Windows Task Scheduler requires Administrator privileges. Toggling auto-start without administrative rights triggers an access error. Migration to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` is on the immediate roadmap.
 - **UAC Prompts & Elevated Windows:** Windows User Account Control (UAC) secure desktop and elevated administrator windows isolate input. Synthetic input injection via standard user privileges is blocked by Windows UIPI (User Interface Privilege Isolation). Run the server elevated if UAC interaction is required.
 - **Windows Lock Screen:** Input injection is disabled on the Windows lock screen for security reasons.
 - **Plain HTTP on LAN:** When accessed over plain `http://<LAN-IP>:8080`, browsers restrict certain PWA capabilities (such as full offline Service Workers). The web app functions normally through standard browser navigation and Home Screen shortcuts.
@@ -222,7 +270,7 @@ The automated test suite runs completely headless without requiring a display or
 
 This project is licensed under the [MIT License](LICENSE).
 
-Copyright (c) 2026 YOUR NAME
+Copyright (c) 2026 Kumar Harsh
 
 ---
 
