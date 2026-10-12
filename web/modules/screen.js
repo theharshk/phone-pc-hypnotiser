@@ -1,4 +1,20 @@
 import { createUnifiedTouchpadAndKeyboard } from './touchpadUI.js';
+
+export function calculateNormalizedTap(clientX, clientY, rect) {
+    if (!rect || rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
+    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    return { x, y };
+}
+
+export function buildScreenTapPayload(x, y, button = 'left') {
+    return {
+        m: 'screen',
+        t: 'tap',
+        d: { x, y, button }
+    };
+}
+
 export default {
     id: 'screen',
     name: 'Screen',
@@ -87,8 +103,7 @@ export default {
         cursor.style.top = '0';
         cursor.style.left = '0';
         cursor.style.transform = 'translate(-50%, -50%)';
-        cursor.style.transition = 'opacity 0.3s ease';
-        cursor.style.opacity = '0';
+        cursor.style.opacity = '1';
         canvasWrapper.appendChild(cursor);
         
         fullscreenContainer.appendChild(canvasWrapper);
@@ -122,26 +137,22 @@ export default {
         };
         fullscreenContainer.appendChild(fsBtn);
 
-        
         this.cleanupUI = createUnifiedTouchpadAndKeyboard(container, api, true);
 
         root.appendChild(fullscreenContainer);
         container.appendChild(root);
 
         img.onclick = (e) => {
-            if (isRelativeMode) return;
             const rect = img.getBoundingClientRect();
-            const nx = (e.clientX - rect.left) / rect.width;
-            const ny = (e.clientY - rect.top) / rect.height;
-            api.send('tap', {x: nx, y: ny, button: 'left'});
+            const { x, y } = calculateNormalizedTap(e.clientX, e.clientY, rect);
+            api.send('tap', {x, y, button: 'left'});
         };
 
         img.oncontextmenu = (e) => {
             e.preventDefault();
             const rect = img.getBoundingClientRect();
-            const nx = (e.clientX - rect.left) / rect.width;
-            const ny = (e.clientY - rect.top) / rect.height;
-            api.send('tap', {x: nx, y: ny, button: 'right'});
+            const { x, y } = calculateNormalizedTap(e.clientX, e.clientY, rect);
+            api.send('tap', {x, y, button: 'right'});
         };
 
         const handleVisibility = () => {
@@ -152,20 +163,6 @@ export default {
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
-
-        let cursorTimeout = null;
-
-        const wakeCursor = () => {
-            cursor.style.opacity = '1';
-            if (cursorTimeout) clearTimeout(cursorTimeout);
-            cursorTimeout = setTimeout(() => {
-                cursor.style.opacity = '0';
-            }, 2500);
-        };
-
-        img.addEventListener('touchstart', wakeCursor, {passive: true});
-        img.addEventListener('mousemove', wakeCursor, {passive: true});
-        img.addEventListener('mousedown', wakeCursor, {passive: true});
 
         api.on = async (type, data) => {
             if (type === 'cursor') {
@@ -222,9 +219,6 @@ export default {
                 lastUrl = null;
             }
             if (this.cleanupUI) this.cleanupUI();
-            if (false) {
-                hiddenInput.parentNode.removeChild(hiddenInput);
-            }
         };
     },
 

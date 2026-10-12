@@ -50,6 +50,22 @@ function safeStorageRemove(key) {
     } catch (e) {}
 }
 
+function generateDeviceId() {
+    try {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+    } catch (e) {}
+    return 'dev-' + Math.random().toString(36).substring(2, 15) + '-' + Date.now().toString(36);
+}
+
+// Stable Client ID: persist immediately on script load if missing or empty
+let clientDeviceId = safeStorageGet('pr_device_id');
+if (!clientDeviceId) {
+    clientDeviceId = generateDeviceId();
+    safeStorageSet('pr_device_id', clientDeviceId);
+}
+
 // --------------------------------------------------------------------------
 // Settings State & Haptics
 // --------------------------------------------------------------------------
@@ -57,6 +73,7 @@ let userTheme = safeStorageGet('pr_theme', 'dark');
 let isBedside = safeStorageGet('pr_bedside', 'false') === 'true';
 let hapticsEnabled = safeStorageGet('pr_haptics', 'true') === 'true';
 let touchpadSpeed = parseFloat(safeStorageGet('pr_touchpad_speed', '1.0')) || 1.0;
+let streamSpeed = safeStorageGet('pr_stream_speed', 'turbo');
 
 function triggerHaptic(duration = 35) {
     if (!hapticsEnabled) return;
@@ -570,6 +587,19 @@ function renderSettingsScreen() {
                 </div>
                 <input type="range" id="speed-slider" class="speed-slider" min="0.5" max="2.0" step="0.1" value="${touchpadSpeed}">
             </div>
+            <div class="settings-row">
+                <div class="settings-label">
+                    <span class="settings-name">Streaming Typing Speed</span>
+                    <span class="settings-subtext">Clipboard paste speed to PC</span>
+                </div>
+                <select id="stream-speed-select" class="pill-btn-outline" style="padding:6px 10px; min-height:38px; border-radius:12px; background:var(--card-alt); color:var(--text); font-weight:600; font-size:0.85rem; outline:none; border:1px solid var(--border);">
+                    <option value="turbo" ${streamSpeed === 'turbo' ? 'selected' : ''}>Turbo (~2,200 WPM) [Default]</option>
+                    <option value="world_record" ${streamSpeed === 'world_record' ? 'selected' : ''}>World Record Typist (~215 WPM)</option>
+                    <option value="pro" ${streamSpeed === 'pro' ? 'selected' : ''}>Pro Typist (~120 WPM)</option>
+                    <option value="fast" ${streamSpeed === 'fast' ? 'selected' : ''}>Fast Typist (~75 WPM)</option>
+                    <option value="human" ${streamSpeed === 'human' ? 'selected' : ''}>Average Human (~55 WPM)</option>
+                </select>
+            </div>
             <div class="settings-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                     <div class="settings-label">
@@ -650,6 +680,16 @@ function renderSettingsScreen() {
         speedSlider.oninput = () => {
             touchpadSpeed = parseFloat(speedSlider.value) || 1.0;
             safeStorageSet('pr_touchpad_speed', touchpadSpeed.toString());
+        };
+    }
+
+    // Streaming typing speed
+    const streamSpeedSelect = document.getElementById('stream-speed-select');
+    if (streamSpeedSelect) {
+        streamSpeedSelect.onchange = () => {
+            streamSpeed = streamSpeedSelect.value || 'turbo';
+            safeStorageSet('pr_stream_speed', streamSpeed);
+            triggerHaptic(10);
         };
     }
 
@@ -1052,8 +1092,24 @@ function connect() {
         updateStatus('reconnecting', 'Authenticating...');
         currentDelay = 500;
 
+        // Immediate Heartbeat: Keep socket alive during pending approval
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    m: 'core',
+                    t: 'ping',
+                    i: Date.now()
+                }));
+            }
+        }, 10000);
+
         let token = safeStorageGet('pr_token', '');
         let deviceId = safeStorageGet('pr_device_id', '');
+        if (!deviceId) {
+            deviceId = generateDeviceId();
+            safeStorageSet('pr_device_id', deviceId);
+        }
 
         ws.send(JSON.stringify({
             m: 'core',
@@ -1123,7 +1179,8 @@ function connect() {
                         activeModuleId = null;
                     }
                     safeStorageRemove('pr_token');
-                    safeStorageRemove('pr_device_id');
+                    const freshDeviceId = generateDeviceId();
+                    safeStorageSet('pr_device_id', freshDeviceId);
                     showAuthOverlay(`
                         <div class="auth-card">
                             <svg viewBox="0 0 24 24" width="60" height="60" stroke="var(--danger)" stroke-width="2" fill="none" style="margin-bottom:16px;"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
@@ -1131,6 +1188,11 @@ function connect() {
                             <p style="color:var(--muted); font-size:1rem;">Access has been revoked from the host PC. Please refresh the page to pair again.</p>
                         </div>
                     `);
+                    if (ws) {
+                        try { ws.close(); } catch (e) {}
+                    }
+                } else if (msg.d && (msg.d.type === 'paused' || msg.d.code === 'paused')) {
+                    updateStatus('reconnecting', 'Remote control paused');
                     if (ws) {
                         try { ws.close(); } catch (e) {}
                     }
@@ -1155,16 +1217,17 @@ function connect() {
                 const initialRoute = window.location.hash.replace(/^#/, '');
                 renderRoute(initialRoute || 'home');
 
-                if (pingInterval) clearInterval(pingInterval);
-                pingInterval = setInterval(() => {
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            m: 'core',
-                            t: 'ping',
-                            i: Date.now()
-                        }));
-                    }
-                }, 10000);
+                if (!pingInterval) {
+                    pingInterval = setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                m: 'core',
+                                t: 'ping',
+                                i: Date.now()
+                            }));
+                        }
+                    }, 10000);
+                }
             } else if (msg.t === 'layout') {
                 availableModules = msg.d.available || [];
                 currentLayout = msg.d.layout || [];
@@ -1173,7 +1236,9 @@ function connect() {
                 if (!route || route === 'home') renderHomeScreen();
             } else if (msg.t === 'pong') {
                 const rtt = Date.now() - (msg.i || 0);
-                updateStatus('connected', `Connected, ${rtt} ms`);
+                if (isAuthenticated) {
+                    updateStatus('connected', `Connected, ${rtt} ms`);
+                }
             }
         } else if (activeModuleId && msg.m === activeModuleId) {
             if (activeModuleApi && typeof activeModuleApi.on === 'function') {
@@ -1224,4 +1289,5 @@ if (typeof window !== 'undefined') {
     window.showConfirmDialog = showConfirmDialog;
     window.showAuthOverlay = showAuthOverlay;
     window.hideAuthOverlay = hideAuthOverlay;
+    window.generateDeviceId = generateDeviceId;
 }

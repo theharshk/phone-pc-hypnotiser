@@ -4,8 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- CSRF token will be injected here by the server -->
-    <title>Phone Remote Admin</title>
     <link rel="stylesheet" href="/admin/admin.css">
+    <style>
+        .pin-input-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+        }
+        .pin-toggle-btn {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--muted);
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+        .pin-toggle-btn:hover {
+            color: var(--ink);
+            background: rgba(0, 0, 0, 0.05);
+        }
+    </style>
 </head>
 <body>
     <nav class="sidebar">
@@ -81,7 +107,12 @@
                     <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 40px; min-height: 220px;">
                         <div id="pinInputContainer" style="width:100%; display:none; flex-direction:column; margin-bottom: 20px;">
                             <label style="font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; font-size:0.95rem; margin-bottom:16px;">Set 6-Digit PIN</label>
-                            <input type="text" id="pinInputOverview" placeholder="••••••" maxlength="6" pattern="\d{6}" style="font-size: 3rem; letter-spacing: 0.4em; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-align: center; width: 100%; max-width: 340px; padding: 20px; background: #ffffff; border: 2px solid rgba(0,0,0,0.1); border-radius: 16px; color: var(--ink); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                            <div class="pin-input-wrapper">
+                                <input type="password" id="pinInputOverview" inputmode="numeric" placeholder="••••••" maxlength="6" pattern="\d{6}" style="font-size: 2.2rem; letter-spacing: 0.25em; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-align: center; width: 100%; padding: 16px 50px; box-sizing: border-box; background: #ffffff; border: 2px solid rgba(0,0,0,0.1); border-radius: 16px; color: var(--ink); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                                <button id="togglePinVisibilityBtn" class="pin-toggle-btn" type="button" aria-label="Toggle PIN visibility" onclick="togglePinVisibility('pinInputOverview', this)">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                            </div>
                         </div>
                         <button class="btn btn-black" style="padding: 16px 40px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onclick="saveSecuritySettings()">Update</button>
                     </div>
@@ -196,7 +227,12 @@
                     <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 40px; min-height: 220px;">
                         <div id="pinInputContainerSettings" style="width:100%; display:none; flex-direction:column; margin-bottom: 20px;">
                             <label style="font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; font-size:0.95rem; margin-bottom:16px;">Set 6-Digit PIN</label>
-                            <input type="text" id="pinInputSettings" placeholder="••••••" maxlength="6" pattern="\d{6}" style="font-size: 3rem; letter-spacing: 0.4em; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-align: center; width: 100%; max-width: 340px; padding: 20px; background: #ffffff; border: 2px solid rgba(0,0,0,0.1); border-radius: 16px; color: var(--ink); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                            <div class="pin-input-wrapper">
+                                <input type="password" id="pinInputSettings" inputmode="numeric" placeholder="••••••" maxlength="6" pattern="\d{6}" style="font-size: 2.2rem; letter-spacing: 0.25em; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-align: center; width: 100%; padding: 16px 50px; box-sizing: border-box; background: #ffffff; border: 2px solid rgba(0,0,0,0.1); border-radius: 16px; color: var(--ink); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease;">
+                                <button id="togglePinVisibilityBtnSettings" class="pin-toggle-btn" type="button" aria-label="Toggle PIN visibility" onclick="togglePinVisibility('pinInputSettings', this)">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                            </div>
                         </div>
                         <button class="btn btn-black" style="padding: 16px 40px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onclick="saveSecuritySettings(true)">Update</button>
                     </div>
@@ -214,5 +250,17 @@
     </main>
     <script src="/admin/assets/qrcode.min.js"></script>
     <script src="/admin/admin.js"></script>
+    <script>
+        function togglePinVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            btn.innerHTML = isPassword
+                ? `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
+                : `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+            btn.setAttribute('aria-label', isPassword ? 'Hide PIN' : 'Show PIN');
+        }
+    </script>
 </body>
 </html>

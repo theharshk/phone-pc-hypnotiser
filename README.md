@@ -12,7 +12,10 @@ A self-hosted, lightweight remote control system allowing an Android smartphone 
 ## Features
 
 - **Touchpad:** Smooth cursor control, tap-to-click, two-finger right click, two-finger scroll, and tap-and-drag.
-- **Keyboard:** Live typing support (including soft keyboards and IMEs), virtual key bar with modifier keys (Ctrl, Alt, Shift, Win), function keys, and navigation keys.
+- **Keyboard & Clipboard Modes:**
+  - *Live Inline Typing:* Live keystroke typing via mobile soft keyboard (Gboard, Samsung Keyboard, etc.) with modifier combos (Ctrl, Alt, Shift, Win), Esc, Tab, Enter, Backspace, and arrow keys.
+  - *Direct Clipboard Paste:* Long clipboard snippets pasted into the input stream in fast 50-character native Unicode chunks.
+  - *Streaming Typing Engine:* Dedicated "Clipboard Paste" modal types character-by-character (~2,200 WPM) via native Unicode keystrokes to bypass website paste restrictions. Consecutive newlines (`\n\n`) each emit distinct virtual Enters with key-hold timing, tabs (`\t`) preserve indentation, and a live "Typing to PC..." UI provides real-time progress with an instant "Stop" button.
 - **Media Controls:** Play/Pause, Next Track, Previous Track, Volume Up/Down, and Mute using Windows multimedia keys.
 - **Power Actions:** Shutdown, Restart, Sleep, Hibernate, and Lock Workstation with hold-to-confirm safeguards and cancellation timer.
 - **Live Screen Streaming:** Real-time JPEG screen capture with adjustable quality, scaling, and tap-to-control coordinate mapping.
@@ -108,13 +111,11 @@ Admin address: http://localhost:8080/admin
 
 ## Windows Firewall
 
-When running Phone Remote for the first time, Windows Defender Firewall will prompt to allow network access:
-1. **Allow Java on Private networks only.** Ensure the **Private networks** box is checked and **Public networks** is unchecked.
-2. **How to verify or adjust manually:**
-   - Open **Windows Security** $\rightarrow$ **Firewall & network protection**.
-   - Click **Allow an app through firewall**.
-   - Click **Change settings**, locate **Java(TM) Platform SE binary**.
-   - Verify that only the **Private** checkbox is selected for Phone Remote's port (`8080`).
+On first run, Windows asks to allow the app. Choose **Private networks only**.
+
+If the phone can’t connect:
+- Check that your Wi-Fi network profile is set to **Private** in Windows settings.
+- Ensure the app / Java is not blocked under **Windows Security** → **Firewall & network protection** → **Allow an app through firewall** (Private checked).
 
 ---
 
