@@ -1,16 +1,48 @@
-# Phone Remote (Phone-to-PC Controller)
+# Phone PC Hypnotiser
 
-[![CI](https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml/badge.svg)](https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml)
+<p align="center">
+  <img src="web/icon.png" width="128" height="128" alt="Phone PC Hypnotiser Logo" style="border-radius: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+</p>
+
+<p align="center">
+  <a href="https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml">
+    <img src="https://github.com/theharshk/phone-pc-hypnotiser/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+</p>
 
 > 🚧 **Project Status: Work in Progress (WIP)**  
 > This project is currently in active development. Core remote control features (Touchpad, Keyboard, Media, Power, and Screen Streaming) are fully functional over local Wi-Fi with an automated headless test suite. Conversion into a standalone `.exe`, installer generation, and extended features are underway.
 
 A self-hosted, lightweight remote control system allowing an Android smartphone to control a Windows PC over local Wi-Fi. Built with a **Java (Spring Boot)** host and a zero-install **Progressive Web App (PWA)** client.
 
-<!-- Placeholders for Screenshots and Demo GIF -->
-<!-- ![Phone Remote Demo](docs/demo.gif) -->
-<!-- ![Mobile Touchpad Interface](docs/screenshots/mobile-touchpad.png) -->
-<!-- ![Desktop Admin Dashboard](docs/screenshots/admin-dashboard.png) -->
+---
+
+## 📸 Screenshots & Interface
+
+### 🖥️ Desktop Host & Admin Dashboard (Loopback-Only)
+*Secure loopback-only control panel (`http://localhost:8080/admin`) for connection QR codes, PIN management, active session monitoring, and device approvals.*
+
+| Connection Overview & QR Code | Paired Devices & Approval Queue |
+| :---: | :---: |
+| <img src="docs/screenshots/admin-overview.png" width="450" alt="Admin Dashboard Overview"> | <img src="docs/screenshots/admin-devices.png" width="450" alt="Admin Device Management"> |
+
+---
+
+### 📱 Mobile Client Navigation & Settings
+*Zero-install progressive web application with instant connection metrics, ultra-low latency status (< 5 ms), and customizable haptic feedback.*
+
+| Dark Mode (OLED) | Light Mode | Settings & Presets |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/mobile-dark.png" width="240" alt="Mobile Dark Mode"> | <img src="docs/screenshots/mobile-light.png" width="240" alt="Mobile Light Mode"> | <img src="docs/screenshots/mobile-settings.png" width="240" alt="Mobile Settings & Presets"> |
+
+---
+
+### 🎮 Mobile Remote Control Modules
+*Responsive touch-optimized control modules engineered for real-time interaction over local Wi-Fi.*
+
+| Touchpad | Keyboard & Modifiers | Media Controls | Screen Streaming | Power Actions |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/mobile-touchpad.png" width="160" alt="Touchpad Module"> | <img src="docs/screenshots/mobile-keyboard.png" width="160" alt="Keyboard Module"> | <img src="docs/screenshots/mobile-media.png" width="160" alt="Media Module"> | <img src="docs/screenshots/mobile-screen.png" width="160" alt="Screen Streaming"> | <img src="docs/screenshots/mobile-power.png" width="160" alt="Power Controls"> |
 
 ---
 
@@ -113,7 +145,7 @@ java -jar target/server-1.0-SNAPSHOT.jar
 
 The interactive wizard will prompt:
 ```text
-=== Phone Remote First Run ===
+=== Phone PC Hypnotiser First Run ===
 Set a 6-digit PIN? (recommended) [y/n]: y
 Enter 6-digit PIN: 123456
 PIN set securely. You will need it to pair your first device.
@@ -144,12 +176,12 @@ Windows Task Scheduler requires administrator privileges to register a task that
    java -jar target\server-1.0-SNAPSHOT.jar
    ```
 3. **Enable Auto-Start from the System Tray:**
-   - Locate the **Phone Remote** icon in your Windows System Tray (next to the clock in the taskbar).
+   - Locate the **Phone PC Hypnotiser** icon in your Windows System Tray (next to the clock in the taskbar).
    - Right-click the icon and click **"Enable auto-start"**.
-   - With administrator privileges active, Windows Task Scheduler successfully creates the `PhoneRemote` scheduled task.
+   - With administrator privileges active, Windows Task Scheduler successfully creates the `PhonePCHypnotiser` scheduled task.
 4. **Done!**
    - You can now close the terminal or quit the app.
-   - On every future Windows login, Phone Remote will launch silently in the background.
+   - On every future Windows login, Phone PC Hypnotiser will launch silently in the background.
 
 *(Note: Migration to standard unprivileged `HKCU` Windows Registry auto-start is planned on the roadmap to remove this one-time admin requirement).*
 
@@ -233,6 +265,16 @@ Phone                         Server                       PC / Admin
 ## Testing
 
 The project is backed by **107 automated tests** (66 Java backend + 41 Node.js frontend) running completely headless without requiring a display or physical screen:
+
+```powershell
+# Run backend Java test suite (66 tests)
+cd server
+mvn test
+
+# Run frontend Web test suite (41 tests)
+cd ../web
+node --test client.test.mjs
+```
 
 ### 1. Backend Java Test Suite (66 tests — JUnit 5, Mockito, Spring Boot Test)
 Run via `mvn test` in `server/` (and automated on GitHub Actions CI):
