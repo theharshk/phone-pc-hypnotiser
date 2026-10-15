@@ -74,7 +74,7 @@ flowchart TD
 - [x] **Core Remote Control:** Smooth cursor deltas, Unicode keyboard injection, multimedia controls, and safe power actions.
 - [x] **Low-Latency Screen Streaming:** Pipelined capture-encode-send threads (~10 fps at 720p).
 - [x] **Security & Auth:** Salted BCrypt PIN pairing, live session revocation, rate-limited lockout, and loopback-only admin dashboard.
-- [x] **Automated Testing & CI:** 66/66 automated JUnit tests using fake/headless OS adapters and GitHub Actions CI workflow.
+- [x] **Automated Testing & CI:** 107 total automated tests (66 Java backend JUnit tests + 41 Node.js frontend tests) running headless with 100% pass rate.
 
 ### 🚀 Next Up: Standalone Executable & UX
 - [ ] **Native `.exe` Conversion (`jpackage`):** Package the Java application into a standalone Windows `.exe` with an embedded, stripped-down Java runtime (via `jlink`). End users will **not need Java or Maven installed** on their PC.
@@ -232,11 +232,14 @@ Phone                         Server                       PC / Admin
 
 ## Testing
 
-### Automated Testing (JUnit 5, Mockito, Spring Boot Test)
-The automated test suite runs completely headless without requiring a display or native Windows Robot:
-- **Unit & Logic Tests:** PIN hashing (BCrypt), lockout tracker escalation and freezing with mock clocks, cryptographic token hashing and verification, atomic file configuration writes.
-- **Module Tests:** Touchpad coordinate delta handling, keyboard unicode and sticky modifiers, media controls, power confirm tokens and delayed shutdown scheduling, and screen frame pipeline formatting against `FakeInputAdapter`, `FakePowerAdapter`, and `FakeScreenAdapter`.
-- **Security & Hardening Tests (`SecurityTests`):**
+The project is backed by **107 automated tests** (66 Java backend + 41 Node.js frontend) running completely headless without requiring a display or physical screen:
+
+### 1. Backend Java Test Suite (66 tests — JUnit 5, Mockito, Spring Boot Test)
+Run via `mvn test` in `server/` (and automated on GitHub Actions CI):
+- **Unit & Logic Tests (18 tests):** PIN hashing (BCrypt), lockout tracker escalation and freezing with mock clocks, cryptographic token hashing and verification, atomic file configuration writes, and layout persistence.
+- **Module & Adapter Tests (28 tests):** Touchpad coordinate delta handling, keyboard Unicode and sticky modifier states, media keys, power confirm tokens and delayed shutdown scheduling, and screen frame pipeline formatting against `FakeInputAdapter`, `FakePowerAdapter`, and `FakeScreenAdapter`.
+- **System Tray & Auto-Start Tests (10 tests):** Task Scheduler task generation, logon command building, tray menu lifecycle, and background config verification.
+- **Security & Hardening Tests (10 tests — `SecurityTests`):**
   - Rejection of unauthenticated messages across touchpad, keyboard, media, power, and screen modules.
   - Enforcement of 10-second timeout on unauthenticated sockets.
   - Rejection of unknown and revoked tokens in `hello`.
@@ -248,7 +251,17 @@ The automated test suite runs completely headless without requiring a display or
   - HTML escaping of device names and log outputs in admin dashboard JSON responses.
   - Automated log capturing verifying that secrets (PINs, tokens, typed text, raw incoming payloads) never appear in application logs or standard output.
 
-### Manual Verification
+### 2. Frontend Web Test Suite (41 tests — Node.js Test Runner)
+Run via `node --test client.test.mjs` in `web/`:
+- **Streaming Clipboard & Paste Modal (10 tests):** Streaming text payloads, cancel stream actions, modal state transitions, and 5 typing speed presets.
+- **Touchpad & Gestures (6 tests):** Speed sensitivity multipliers, acceleration curves, and delta movement extraction.
+- **Keyboard State Machine (3 tests):** Soft keyboard input parsing, modifier cycling (inactive $\rightarrow$ armed $\rightarrow$ locked), and automatic key release.
+- **Screen Module Coordinate Mapping (6 tests):** Normalized ($0.0 \dots 1.0$) tap coordinate calculations, bounding rect boundary clamping, and left/right click payloads.
+- **Auth & Session Management (10 tests):** Disconnect cleanup, token clearance, stable device ID generation/persistence, and heartbeat ping/pong lifecycle.
+- **Theme & Settings Persistence (5 tests):** Dark / Light / System theme resolution and Bedside mode storage resilience.
+- **Browser Layout & Viewport Verification (1 test — `overflow.test.cjs`):** Headless Chrome layout validation ensuring zero unwanted viewport scroll or overflow.
+
+### 3. Manual Verification
 - Physical mobile device verification (Android Chrome, Samsung Internet) over private Wi-Fi.
 - Touchpad gesture responsiveness, two-finger scrolling, and tap-and-drag accuracy.
 - Soft keyboard typing, modifier keys, and streaming clipboard typing across desktop target applications.
